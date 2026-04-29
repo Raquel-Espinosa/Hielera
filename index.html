@@ -504,21 +504,38 @@
       };
 
       const stats = useMemo(() => {
-        const total = inventory.length;
-        const enCedis = inventory.filter(i => i.estatus === 'CEDIS').length;
-        const enTienda = inventory.filter(i => i.estatus === 'En Tienda').length;
-        const dañadas = inventory.filter(i => i.estatus === 'Dañada').length;
-        return { total, enCedis, enTienda, dañadas };
+        const getStats = (tipo) => {
+          const filtered = inventory.filter(i => i.tipo === tipo);
+          return {
+            total: filtered.length,
+            enCedis: filtered.filter(i => i.estatus === 'CEDIS').length,
+            enTienda: filtered.filter(i => i.estatus === 'En Tienda').length,
+            dañadas: filtered.filter(i => i.estatus === 'Dañada' || i.estatus === 'Perdida').length
+          };
+        };
+        return {
+          hieleras: getStats('Hielera'),
+          placas: getStats('Placa')
+        };
       }, [inventory]);
 
-      const storesStock = useMemo(() => {
-        return stores.map(store => {
-          // FIX: Ahora compara tanto por Nombre como por ID (T-01) para el cálculo correcto
+      const zonesStock = useMemo(() => {
+        // Extraer zonas únicas (ignorando vacíos)
+        const uniqueZones = [...new Set(stores.map(s => s.zona).filter(Boolean))];
+        
+        return uniqueZones.map(zona => {
+          // Obtener todas las tiendas que pertenecen a esta zona
+          const storesInZone = stores.filter(s => s.zona === zona);
+          const storeNames = storesInZone.map(s => s.nombre);
+          const storeIds = storesInZone.map(s => s.id);
+          
+          // Contar todos los activos "En Tienda" cuya ubicación coincida con alguna tienda de esta zona
           const stock = inventory.filter(item => 
-            (item.ubicacion === store.nombre || item.ubicacion === store.id) && 
+            (storeNames.includes(item.ubicacion) || storeIds.includes(item.ubicacion)) && 
             item.estatus === 'En Tienda'
           ).length;
-          return { ...store, stock };
+          
+          return { zona, stock };
         }).sort((a, b) => b.stock - a.stock);
       }, [stores, inventory]);
 
@@ -747,11 +764,28 @@
 
             {activeTab === 'overview' && (
               <div className="space-y-10">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                  <StatCard label="Flota Total" value={stats.total} icon={<Package className="text-blue-600"/>} color="blue" />
-                  <StatCard label="Stock CEDIS" value={stats.enCedis} icon={<CheckCircle2 className="text-green-600"/>} color="green" />
-                  <StatCard label="En Tiendas" value={stats.enTienda} icon={<Truck className="text-orange-600"/>} color="orange" />
-                  <StatCard label="Fuera de Servicio" value={stats.dañadas} icon={<AlertTriangle className="text-red-600"/>} color="red" />
+                <div className="space-y-4">
+                  <h3 className="font-black text-slate-500 uppercase tracking-widest text-xs flex items-center gap-2">
+                    <Package size={16} className="text-blue-500" /> Resumen de Hieleras
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <StatCard label="Total Hieleras" value={stats.hieleras.total} icon={<Package className="text-blue-600"/>} color="blue" />
+                    <StatCard label="Stock CEDIS" value={stats.hieleras.enCedis} icon={<CheckCircle2 className="text-green-600"/>} color="green" />
+                    <StatCard label="En Tiendas" value={stats.hieleras.enTienda} icon={<Truck className="text-orange-600"/>} color="orange" />
+                    <StatCard label="Fuera de Servicio" value={stats.hieleras.dañadas} icon={<AlertTriangle className="text-red-600"/>} color="red" />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-black text-slate-500 uppercase tracking-widest text-xs flex items-center gap-2">
+                    <Package size={16} className="text-indigo-500" /> Resumen de Placas
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <StatCard label="Total Placas" value={stats.placas.total} icon={<Package className="text-indigo-600"/>} color="blue" />
+                    <StatCard label="Stock CEDIS" value={stats.placas.enCedis} icon={<CheckCircle2 className="text-green-600"/>} color="green" />
+                    <StatCard label="En Tiendas" value={stats.placas.enTienda} icon={<Truck className="text-orange-600"/>} color="orange" />
+                    <StatCard label="Fuera de Servicio" value={stats.placas.dañadas} icon={<AlertTriangle className="text-red-600"/>} color="red" />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
@@ -778,16 +812,16 @@
                   <div className="bg-white p-10 rounded-3xl border-2 border-slate-100 shadow-sm">
                     <h3 className="font-black text-slate-800 uppercase tracking-tight text-xl italic mb-8">Stock por Zona</h3>
                     <div className="space-y-8 overflow-y-auto max-h-64 pr-2">
-                      {storesStock.length === 0 ? (
-                        <p className="text-slate-400 text-sm font-bold">No hay tiendas registradas</p>
-                      ) : storesStock.map((s, i) => {
-                        const maxStock = Math.max(...storesStock.map(st => st.stock), 1);
-                        const width = Math.max((s.stock / maxStock) * 100, 5);
+                      {zonesStock.length === 0 ? (
+                        <p className="text-slate-400 text-sm font-bold">No hay zonas registradas</p>
+                      ) : zonesStock.map((z, i) => {
+                        const maxStock = Math.max(...zonesStock.map(st => st.stock), 1);
+                        const width = Math.max((z.stock / maxStock) * 100, 5);
                         return (
-                          <div key={`zone-stock-${s.id}-${i}`} className="space-y-3">
+                          <div key={`zone-stock-${z.zona}-${i}`} className="space-y-3">
                             <div className="flex justify-between text-[11px] font-black uppercase tracking-tighter">
-                              <span className="text-slate-600 truncate pr-2">{s.nombre}</span>
-                              <span className="text-blue-600 shrink-0">{s.stock} UNI</span>
+                              <span className="text-slate-600 truncate pr-2">Zona {z.zona}</span>
+                              <span className="text-blue-600 shrink-0">{z.stock} UNI</span>
                             </div>
                             <div className="h-3 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
                               <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-500 rounded-full" style={{ width: `${width}%` }}></div>
