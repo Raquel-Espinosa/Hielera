@@ -516,14 +516,20 @@
         setSearchTerm(''); 
       };
 
+      // Separación estricta de Placas y Hieleras con reconocimiento flexible de estatus
       const stats = useMemo(() => {
         const getStats = (tipo) => {
-          const filtered = inventory.filter(i => i.tipo === tipo);
+          // Filtrado flexible ignorando mayúsculas/minúsculas y espacios
+          const filtered = inventory.filter(i => String(i.tipo).trim().toLowerCase() === String(tipo).toLowerCase());
           return {
             total: filtered.length,
-            enCedis: filtered.filter(i => i.estatus === 'CEDIS').length,
-            enTienda: filtered.filter(i => i.estatus === 'En Tienda').length,
-            dañadas: filtered.filter(i => i.estatus === 'Dañada' || i.estatus === 'Perdida').length
+            enCedis: filtered.filter(i => String(i.estatus).trim().toUpperCase() === 'CEDIS').length,
+            enTienda: filtered.filter(i => String(i.estatus).trim().toUpperCase() === 'EN TIENDA').length,
+            dañadas: filtered.filter(i => {
+              const estatusTexto = String(i.estatus).trim().toLowerCase();
+              // Busca coincidencias exactas incluyendo los términos "Daño" y "Pérdida" con sus acentos
+              return estatusTexto === 'daño' || estatusTexto === 'pérdida' || estatusTexto === 'dañada' || estatusTexto === 'perdida';
+            }).length
           };
         };
         return {
