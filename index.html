@@ -8,20 +8,15 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
+  <!-- FontAwesome (Para iconos ultrarrápidos y sin errores de React) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
   <!-- React & ReactDOM (Usando CDNJS por mayor estabilidad) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
-  
-  <!-- FIX CRÍTICO: Asegurar que React está globalmente disponible antes de cargar Lucide -->
-  <script>
-    window.react = window.React;
-  </script>
 
   <!-- Babel para compilar JSX en el navegador -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.3/babel.min.js" crossorigin></script>
-
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide-react@0.292.0/dist/umd/lucide-react.min.js" crossorigin></script>
 
   <style>
     ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -37,45 +32,8 @@
 
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
-    
-    // --- LÓGICA DE ICONOS A PRUEBA DE FALLOS ---
-    const iconsLib = window.lucideReact || window.LucideReact || {};
-    
-    // Si el icono falla, pinta un SVG circular de respaldo para evitar el error "is not a function"
-    const getIcon = (name) => {
-      if (iconsLib[name]) return iconsLib[name];
-      return ({size=24, className=""}) => (
-        <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10"></circle>
-        </svg>
-      );
-    };
 
-    const LayoutDashboard = getIcon('LayoutDashboard');
-    const Truck = getIcon('Truck');
-    const Package = getIcon('Package');
-    const BarChart3 = getIcon('BarChart3');
-    const Settings = getIcon('Settings');
-    const LogOut = getIcon('LogOut');
-    const Scan = getIcon('Scan');
-    const CheckCircle2 = getIcon('CheckCircle2');
-    const AlertTriangle = getIcon('AlertTriangle');
-    const FileText = getIcon('FileText');
-    const Users = getIcon('Users');
-    const Search = getIcon('Search');
-    const Filter = getIcon('Filter');
-    const ArrowRightLeft = getIcon('ArrowRightLeft');
-    const ChevronRight = getIcon('ChevronRight');
-    const ClipboardList = getIcon('ClipboardList');
-    const Loader2 = getIcon('Loader2');
-    const Store = getIcon('Store');
-    const UserPlus = getIcon('UserPlus');
-    const Plus = getIcon('Plus');
-    const X = getIcon('X');
-    const AlertOctagon = getIcon('AlertOctagon');
-    const Download = getIcon('Download');
-
-    // --- CONFIGURACIÓN DE API (Tu enlace más reciente) ---
+    // --- CONFIGURACIÓN DE API ---
     const API_URL = "https://script.google.com/macros/s/AKfycbzcUOt003D02aKsQF8K_693RTBN3HdX_45Pn9Dg3MloxKrIElfwi-2xEtG9vPkuokVywQ/exec";
 
     // --- CONECTOR MAESTRO GOOGLE SHEETS ---
@@ -100,17 +58,25 @@
     };
 
     // --- MOCK DATA DE RESPALDO ---
+    const getLocalYYYYMMDD = (date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
+    const todayDate = new Date();
+    const todayStr = getLocalYYYYMMDD(todayDate);
+    const yesterdayDate = new Date(); yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayStr = getLocalYYYYMMDD(yesterdayDate);
+    const twoDaysAgoDate = new Date(); twoDaysAgoDate.setDate(twoDaysAgoDate.getDate() - 2);
+    const twoDaysAgoStr = getLocalYYYYMMDD(twoDaysAgoDate);
+
     const INITIAL_INVENTORY = [
       { id: 'H-1001', tipo: 'Hielera', estatus: 'CEDIS', ubicacion: 'Almacén A' },
       { id: 'H-1002', tipo: 'Hielera', estatus: 'En Tienda', ubicacion: 'Tienda OXXO Sur' },
       { id: 'P-5001', tipo: 'Placa', estatus: 'Dañada', ubicacion: 'Taller' },
     ];
-
-    const todayStr = new Date().toISOString().split('T')[0];
-    const yesterdayDate = new Date(); yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
-    const twoDaysAgoDate = new Date(); twoDaysAgoDate.setDate(twoDaysAgoDate.getDate() - 2);
-    const twoDaysAgoStr = twoDaysAgoDate.toISOString().split('T')[0];
 
     const INITIAL_INCIDENTS = [
       { id: 'INC-001', activoId: 'P-5001', tipo: 'Daño', descripcion: 'Fuga de líquido refrigerante', fecha: todayStr, usuario: 'operador1' }
@@ -153,8 +119,21 @@
 
       const handleLogin = (e) => {
         e.preventDefault();
-        setUser({ name: 'Operador Logístico', role: 'operador' });
-        setView('dashboard');
+        
+        // Obtener lo que el usuario escribió en los campos
+        const inputUser = e.target.username.value.trim();
+        const inputPass = e.target.password.value.trim();
+        
+        // Buscar si el usuario existe en la base de datos (Google Sheets o local)
+        const foundUser = usersList.find(u => u.usuario === inputUser);
+        
+        if (foundUser) {
+          // Asignar el nombre REAL de la base de datos al operador activo
+          setUser({ name: foundUser.nombre, role: foundUser.rol, username: foundUser.usuario });
+          setView('dashboard');
+        } else {
+          alert("Credenciales incorrectas. Verifique su usuario y PIN en la pestaña de Usuarios.");
+        }
       };
 
       const refreshData = async () => {
@@ -185,14 +164,14 @@
               className={`p-3 rounded-full shadow-lg transition-all ${view === 'mobile' ? 'bg-orange-600 text-white' : 'bg-white text-orange-600 border border-orange-600'}`}
               title="Modo Handheld RF"
             >
-              <Scan size={24} />
+              <i className="fa-solid fa-barcode text-2xl"></i>
             </button>
             <button 
               onClick={() => setView('dashboard')}
               className={`p-3 rounded-full shadow-lg transition-all ${view === 'dashboard' ? 'bg-blue-600 text-white' : 'bg-white text-blue-600 border border-blue-600'}`}
               title="Dashboard PC"
             >
-              <LayoutDashboard size={24} />
+              <i className="fa-solid fa-chart-pie text-2xl"></i>
             </button>
           </div>
 
@@ -209,8 +188,8 @@
       <div className="flex items-center justify-center min-h-screen bg-slate-900 px-4">
         <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 border-blue-600">
           <div className="flex flex-col items-center mb-8">
-            <div className="bg-blue-600 p-4 rounded-xl mb-4 shadow-lg">
-              <Truck className="text-white" size={40} />
+            <div className="bg-blue-600 p-4 rounded-xl mb-4 shadow-lg text-white">
+              <i className="fa-solid fa-truck text-4xl"></i>
             </div>
             <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Hieleras System</h1>
             <p className="text-slate-500 text-sm font-medium">Control de Inventario RF</p>
@@ -218,11 +197,11 @@
           <form onSubmit={onLogin} className="space-y-4">
             <div>
               <label className="block text-[10px] font-black text-slate-500 mb-1 uppercase tracking-widest">Identificador Usuario</label>
-              <input type="text" defaultValue="admin" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+              <input name="username" type="text" defaultValue="admin" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
             </div>
             <div>
               <label className="block text-[10px] font-black text-slate-500 mb-1 uppercase tracking-widest">PIN de Acceso</label>
-              <input type="password" defaultValue="123456" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+              <input name="password" type="password" defaultValue="123456" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
             </div>
             <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl transition-all shadow-xl uppercase tracking-wider mt-4">
               Iniciar Sesión
@@ -361,7 +340,7 @@
               </h2>
             </div>
             <button onClick={() => setView('login')} className="p-2 bg-slate-800 rounded-lg text-slate-400">
-              <LogOut size={20} />
+              <i className="fa-solid fa-sign-out-alt text-xl"></i>
             </button>
           </div>
 
@@ -378,15 +357,15 @@
             {screen === 'menu' && (
               <div className="flex flex-col gap-4 py-4">
                 <button onClick={() => setScreen('salida')} className="bg-orange-600 p-6 rounded-3xl flex flex-col items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_8px_0_rgb(154,52,18)] border-2 border-orange-400">
-                  <Truck size={40} />
+                  <i className="fa-solid fa-truck text-4xl"></i>
                   <span className="font-black text-xl tracking-tight">SALIDA TIENDA</span>
                 </button>
                 <button onClick={() => setScreen('entrada')} className="bg-blue-600 p-6 rounded-3xl flex flex-col items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_8px_0_rgb(29,78,216)] border-2 border-blue-400">
-                  <Package size={40} />
+                  <i className="fa-solid fa-box text-4xl"></i>
                   <span className="font-black text-xl tracking-tight">ENTRADA CEDIS</span>
                 </button>
                 <button onClick={() => setScreen('incidencia')} className="bg-red-600 p-6 rounded-3xl flex flex-col items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_8px_0_rgb(185,28,28)] border-2 border-red-400">
-                  <AlertOctagon size={40} />
+                  <i className="fa-solid fa-circle-exclamation text-4xl"></i>
                   <span className="font-black text-xl tracking-tight">REPORTAR INCIDENCIA</span>
                 </button>
               </div>
@@ -459,7 +438,7 @@
                 <div className="bg-slate-900 p-5 rounded-2xl border-2 border-slate-800">
                   <div className="flex justify-between items-center mb-2">
                     <label className={`block text-[10px] font-black uppercase ${screen === 'incidencia' ? 'text-red-500' : 'text-orange-500'}`}>Esperando Escaneo...</label>
-                    <Scan size={16} className={`${screen === 'incidencia' ? 'text-red-500' : 'text-orange-500'} animate-pulse`} />
+                    <i className={`fa-solid fa-barcode text-base animate-pulse ${screen === 'incidencia' ? 'text-red-500' : 'text-orange-500'}`}></i>
                   </div>
                   <input 
                     type="text" 
@@ -480,7 +459,7 @@
                   <div className="bg-black/50 rounded-2xl max-h-[35vh] overflow-y-auto divide-y divide-slate-800 border border-slate-800 shadow-inner">
                     {scannedItems.length === 0 ? (
                       <div className="p-12 text-center">
-                        <ClipboardList className="mx-auto text-slate-800 mb-2" size={48} />
+                        <i className="fa-solid fa-clipboard-list text-slate-800 text-5xl mb-2"></i>
                         <p className="text-xs text-slate-700 font-bold uppercase italic tracking-widest">Lista Vacía</p>
                       </div>
                     ) : (
@@ -488,7 +467,7 @@
                         <div key={`scan-${code}-${idx}`} className="p-4 flex justify-between items-center animate-in slide-in-from-left duration-200">
                           <span className="font-mono text-2xl font-black tracking-tighter text-slate-200">{code}</span>
                           <div className="bg-green-600/20 p-1 rounded-full text-green-500">
-                            <CheckCircle2 size={24} />
+                            <i className="fa-solid fa-check-circle text-2xl"></i>
                           </div>
                         </div>
                       ))
@@ -517,7 +496,7 @@
                     : 'bg-slate-700 text-slate-400 cursor-not-allowed'
                 }`}
               >
-                {isSyncing ? <Loader2 className="animate-spin" size={18} /> : 'GUARDAR'}
+                {isSyncing ? <i className="fa-solid fa-spinner fa-spin text-lg"></i> : 'GUARDAR'}
               </button>
             </div>
           )}
@@ -537,7 +516,6 @@
         setSearchTerm(''); 
       };
 
-      // Separación estricta de Placas y Hieleras
       const stats = useMemo(() => {
         const getStats = (tipo) => {
           const filtered = inventory.filter(i => i.tipo === tipo);
@@ -571,24 +549,45 @@
         }).sort((a, b) => b.stock - a.stock);
       }, [stores, inventory]);
 
+      // --- TRADUCTOR DE FECHAS A PRUEBA DE FALLOS PARA LA GRÁFICA ---
       const chartData = useMemo(() => {
         const activityMap = {};
         
         movements.forEach(m => {
           if (!m.fecha) return;
-          const date = String(m.fecha).split(' ')[0]; 
-          const numAssets = m.activos ? String(m.activos).split(',').length : 0;
-          activityMap[date] = (activityMap[date] || 0) + numAssets;
+          
+          let dateKey = "";
+          let rawDate = String(m.fecha).trim();
+          
+          // Formato ISO exacto "YYYY-MM-DD"
+          if (/^\d{4}-\d{2}-\d{2}/.test(rawDate)) {
+             dateKey = rawDate.substring(0, 10);
+          } else {
+             // Intento de parseo de Objeto Date de Javascript
+             const d = new Date(rawDate);
+             if (!isNaN(d.getTime())) {
+                const y = d.getFullYear();
+                const mo = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                dateKey = `${y}-${mo}-${day}`;
+             } else {
+                // Fallback manual cortando el texto
+                dateKey = rawDate.split(' ')[0];
+             }
+          }
+
+          const numAssets = m.activos ? String(m.activos).split(',').filter(a => a.trim() !== '').length : 0;
+          activityMap[dateKey] = (activityMap[dateKey] || 0) + numAssets;
         });
 
         const sortedDates = Object.keys(activityMap).sort();
         let endDate = new Date();
         
         if (sortedDates.length > 0) {
-          const lastDateStr = sortedDates[sortedDates.length - 1];
-          const parts = lastDateStr.split('-');
-          if (parts.length === 3) {
-            endDate = new Date(parts[0], parts[1] - 1, parts[2]);
+          const lastDateStr = sortedDates[sortedDates.length - 1]; // Ej. "2026-04-29"
+          if (/^\d{4}-\d{2}-\d{2}$/.test(lastDateStr)) {
+             const parts = lastDateStr.split('-');
+             endDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
           }
         }
 
@@ -601,16 +600,16 @@
           const month = String(d.getMonth() + 1).padStart(2, '0');
           const day = String(d.getDate()).padStart(2, '0');
           
-          const dateKey = `${year}-${month}-${day}`;
+          const iterDateKey = `${year}-${month}-${day}`;
           const label = `${day}/${month}`;
           
           dataItems.push({
             label: label,
-            value: activityMap[dateKey] || 0
+            value: activityMap[iterDateKey] || 0
           });
         }
 
-        const maxValue = Math.max(...dataItems.map(d => d.value), 10); 
+        const maxValue = Math.max(...dataItems.map(d => d.value), 5); 
         
         return dataItems.map(d => ({
           ...d,
@@ -618,7 +617,6 @@
         }));
       }, [movements]);
 
-      // --- LÓGICA DE FILTRADO PARA TABLAS ---
       const lowerSearch = searchTerm.toLowerCase();
       
       const filteredInventory = inventory.filter(i => 
@@ -710,7 +708,7 @@
             <div className="p-8 border-b border-slate-800">
               <div className="flex items-center gap-4">
                 <div className="bg-blue-600 p-3 rounded-2xl shadow-[0_4px_20px_rgba(37,99,235,0.4)]">
-                  <Truck size={28} />
+                  <i className="fa-solid fa-truck text-2xl"></i>
                 </div>
                 <div>
                   <span className="font-black text-2xl tracking-tighter uppercase block leading-none">Hieleras</span>
@@ -720,12 +718,12 @@
             </div>
             
             <nav className="flex-1 p-6 space-y-3 overflow-y-auto">
-              <NavItem icon={<LayoutDashboard size={22}/>} label="General" active={activeTab === 'overview'} onClick={() => changeTab('overview')} />
-              <NavItem icon={<Package size={22}/>} label="Inventario" active={activeTab === 'inventory'} onClick={() => changeTab('inventory')} />
-              <NavItem icon={<Store size={22}/>} label="Tiendas" active={activeTab === 'stores'} onClick={() => changeTab('stores')} />
-              <NavItem icon={<Users size={22}/>} label="Usuarios" active={activeTab === 'users'} onClick={() => changeTab('users')} />
-              <NavItem icon={<AlertOctagon size={22}/>} label="Incidencias" active={activeTab === 'incidents'} onClick={() => changeTab('incidents')} />
-              <NavItem icon={<ArrowRightLeft size={22}/>} label="Histórico" active={activeTab === 'moves'} onClick={() => changeTab('moves')} />
+              <NavItem icon={<i className="fa-solid fa-chart-pie text-xl"></i>} label="General" active={activeTab === 'overview'} onClick={() => changeTab('overview')} />
+              <NavItem icon={<i className="fa-solid fa-box text-xl"></i>} label="Inventario" active={activeTab === 'inventory'} onClick={() => changeTab('inventory')} />
+              <NavItem icon={<i className="fa-solid fa-store text-xl"></i>} label="Tiendas" active={activeTab === 'stores'} onClick={() => changeTab('stores')} />
+              <NavItem icon={<i className="fa-solid fa-users text-xl"></i>} label="Usuarios" active={activeTab === 'users'} onClick={() => changeTab('users')} />
+              <NavItem icon={<i className="fa-solid fa-circle-exclamation text-xl"></i>} label="Incidencias" active={activeTab === 'incidents'} onClick={() => changeTab('incidents')} />
+              <NavItem icon={<i className="fa-solid fa-exchange-alt text-xl"></i>} label="Histórico" active={activeTab === 'moves'} onClick={() => changeTab('moves')} />
             </nav>
 
             <div className="p-6 border-t border-slate-800 space-y-4">
@@ -734,8 +732,8 @@
                 disabled={loading} 
                 className="w-full flex items-center justify-center gap-3 p-4 bg-blue-600/10 text-blue-400 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-600/20 transition-all border border-blue-600/30 disabled:opacity-50"
               >
-                {loading ? <Loader2 size={16} className="animate-spin" /> : <ArrowRightLeft size={16} />} 
-                Sync Google Sheets
+                {loading ? <i className="fa-solid fa-spinner fa-spin text-base"></i> : <i className="fa-solid fa-exchange-alt text-base"></i>} 
+                Sync Sheets
               </button>
               
               <div className="flex items-center justify-between gap-2 p-4 bg-slate-800/40 rounded-2xl border border-slate-800">
@@ -751,7 +749,7 @@
                   className="p-3 bg-slate-700/50 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-xl transition-all"
                   title="Cerrar Sesión"
                 >
-                  <LogOut size={18} />
+                  <i className="fa-solid fa-sign-out-alt text-lg"></i>
                 </button>
               </div>
             </div>
@@ -775,21 +773,21 @@
               </div>
               <div className="flex gap-4">
                 <button onClick={handleDownloadExcel} className="bg-white border-2 border-slate-200 text-slate-700 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
-                  <Download size={16} /> Descargar CSV
+                  <i className="fa-solid fa-download text-base"></i> Descargar CSV
                 </button>
                 {activeTab === 'inventory' && (
                   <button onClick={() => setShowModal('item')} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl flex items-center gap-2">
-                    <Plus size={16} /> Nuevo Activo
+                    <i className="fa-solid fa-plus text-base"></i> Nuevo Activo
                   </button>
                 )}
                 {activeTab === 'stores' && (
                   <button onClick={() => setShowModal('store')} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl flex items-center gap-2">
-                    <Plus size={16} /> Nueva Tienda
+                    <i className="fa-solid fa-plus text-base"></i> Nueva Tienda
                   </button>
                 )}
                 {activeTab === 'users' && (
                   <button onClick={() => setShowModal('user')} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl flex items-center gap-2">
-                    <Plus size={16} /> Nuevo Usuario
+                    <i className="fa-solid fa-plus text-base"></i> Nuevo Usuario
                   </button>
                 )}
               </div>
@@ -799,25 +797,25 @@
               <div className="space-y-10">
                 <div className="space-y-4">
                   <h3 className="font-black text-slate-500 uppercase tracking-widest text-xs flex items-center gap-2">
-                    <Package size={16} className="text-blue-500" /> Resumen de Hieleras
+                    <i className="fa-solid fa-box text-blue-500 text-base"></i> Resumen de Hieleras
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                    <StatCard label="Total Hieleras" value={stats.hieleras.total} icon={<Package className="text-blue-600"/>} color="blue" />
-                    <StatCard label="Stock CEDIS" value={stats.hieleras.enCedis} icon={<CheckCircle2 className="text-green-600"/>} color="green" />
-                    <StatCard label="En Tiendas" value={stats.hieleras.enTienda} icon={<Truck className="text-orange-600"/>} color="orange" />
-                    <StatCard label="Fuera de Servicio" value={stats.hieleras.dañadas} icon={<AlertTriangle className="text-red-600"/>} color="red" />
+                    <StatCard label="Total Hieleras" value={stats.hieleras.total} icon={<i className="fa-solid fa-box text-blue-600 text-2xl"></i>} color="blue" />
+                    <StatCard label="Stock CEDIS" value={stats.hieleras.enCedis} icon={<i className="fa-solid fa-check-circle text-green-600 text-2xl"></i>} color="green" />
+                    <StatCard label="En Tiendas" value={stats.hieleras.enTienda} icon={<i className="fa-solid fa-truck text-orange-600 text-2xl"></i>} color="orange" />
+                    <StatCard label="Fuera de Servicio" value={stats.hieleras.dañadas} icon={<i className="fa-solid fa-exclamation-triangle text-red-600 text-2xl"></i>} color="red" />
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   <h3 className="font-black text-slate-500 uppercase tracking-widest text-xs flex items-center gap-2">
-                    <Package size={16} className="text-indigo-500" /> Resumen de Placas
+                    <i className="fa-solid fa-box text-indigo-500 text-base"></i> Resumen de Placas
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                    <StatCard label="Total Placas" value={stats.placas.total} icon={<Package className="text-indigo-600"/>} color="blue" />
-                    <StatCard label="Stock CEDIS" value={stats.placas.enCedis} icon={<CheckCircle2 className="text-green-600"/>} color="green" />
-                    <StatCard label="En Tiendas" value={stats.placas.enTienda} icon={<Truck className="text-orange-600"/>} color="orange" />
-                    <StatCard label="Fuera de Servicio" value={stats.placas.dañadas} icon={<AlertTriangle className="text-red-600"/>} color="red" />
+                    <StatCard label="Total Placas" value={stats.placas.total} icon={<i className="fa-solid fa-box text-indigo-600 text-2xl"></i>} color="blue" />
+                    <StatCard label="Stock CEDIS" value={stats.placas.enCedis} icon={<i className="fa-solid fa-check-circle text-green-600 text-2xl"></i>} color="green" />
+                    <StatCard label="En Tiendas" value={stats.placas.enTienda} icon={<i className="fa-solid fa-truck text-orange-600 text-2xl"></i>} color="orange" />
+                    <StatCard label="Fuera de Servicio" value={stats.placas.dañadas} icon={<i className="fa-solid fa-exclamation-triangle text-red-600 text-2xl"></i>} color="red" />
                   </div>
                 </div>
 
@@ -872,7 +870,7 @@
               <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
                 <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
                   <div className="relative flex-1">
-                    <Search className="absolute left-5 top-4 text-slate-400" size={20} />
+                    <i className="fa-solid fa-search absolute left-5 top-5 text-slate-400 text-lg"></i>
                     <input 
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
@@ -911,7 +909,7 @@
                             </td>
                             <td className="px-10 py-6 text-slate-500 font-bold text-xs uppercase tracking-tight">{item.ubicacion}</td>
                             <td className="px-10 py-6 text-right">
-                              <button className="text-slate-300 group-hover:text-blue-600 transition-all p-2 bg-slate-50 rounded-lg"><ChevronRight size={22}/></button>
+                              <button className="text-slate-300 group-hover:text-blue-600 transition-all p-2 bg-slate-50 rounded-lg"><i className="fa-solid fa-chevron-right text-xl"></i></button>
                             </td>
                           </tr>
                         ))
@@ -926,7 +924,7 @@
               <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
                 <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
                   <div className="relative flex-1">
-                    <Search className="absolute left-5 top-4 text-slate-400" size={20} />
+                    <i className="fa-solid fa-search absolute left-5 top-5 text-slate-400 text-lg"></i>
                     <input 
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
@@ -972,7 +970,7 @@
               <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
                 <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
                   <div className="relative flex-1">
-                    <Search className="absolute left-5 top-4 text-slate-400" size={20} />
+                    <i className="fa-solid fa-search absolute left-5 top-5 text-slate-400 text-lg"></i>
                     <input 
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
@@ -1020,7 +1018,7 @@
               <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
                 <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
                   <div className="relative flex-1">
-                    <Search className="absolute left-5 top-4 text-slate-400" size={20} />
+                    <i className="fa-solid fa-search absolute left-5 top-5 text-slate-400 text-lg"></i>
                     <input 
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
@@ -1073,7 +1071,7 @@
               <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
                 <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
                   <div className="relative flex-1">
-                    <Search className="absolute left-5 top-4 text-slate-400" size={20} />
+                    <i className="fa-solid fa-search absolute left-5 top-5 text-slate-400 text-lg"></i>
                     <input 
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
@@ -1146,7 +1144,7 @@
                       {showModal === 'user' && 'Nuevo Usuario'}
                     </h2>
                     <button onClick={() => setShowModal(null)} className="p-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 hover:text-slate-800 transition-colors">
-                      <X size={20} />
+                      <i className="fa-solid fa-times text-xl"></i>
                     </button>
                   </div>
 
@@ -1200,7 +1198,7 @@
                         </select>
                       </div>
                       <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50">
-                        {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Guardar Activo'}
+                        {isSaving ? <i className="fa-solid fa-spinner fa-spin text-lg"></i> : 'Guardar Activo'}
                       </button>
                     </form>
                   )}
@@ -1250,7 +1248,7 @@
                         </select>
                       </div>
                       <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50">
-                        {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Registrar Tienda'}
+                        {isSaving ? <i className="fa-solid fa-spinner fa-spin text-lg"></i> : 'Registrar Tienda'}
                       </button>
                     </form>
                   )}
@@ -1306,7 +1304,7 @@
                         </select>
                       </div>
                       <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50">
-                        {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Crear Usuario'}
+                        {isSaving ? <i className="fa-solid fa-spinner fa-spin text-lg"></i> : 'Crear Usuario'}
                       </button>
                     </form>
                   )}
@@ -1354,7 +1352,7 @@
       );
     };
 
-    // Renderizar la app en el div de #root
+    // Renderizar la app
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
