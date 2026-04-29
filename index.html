@@ -1,1307 +1,1362 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  LayoutDashboard, 
-  Truck, 
-  Package, 
-  BarChart3, 
-  Settings, 
-  LogOut, 
-  Scan, 
-  CheckCircle2, 
-  AlertTriangle, 
-  FileText, 
-  Users,
-  Search,
-  Filter,
-  ArrowRightLeft,
-  ChevronRight,
-  ClipboardList,
-  Loader2,
-  Store,
-  UserPlus,
-  Plus,
-  X,
-  AlertOctagon,
-  Download
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hieleras System - Standalone</title>
 
-// --- CONFIGURACIÓN DE API ---
-const API_URL = "https://script.google.com/macros/s/AKfycbwMxaukl8lbLAOKC0ZNET4BrMjtyvOYtujk1ohU__9lj1N5dxlTUVCQfRYlZv9ANc9D0A/exec";
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-// --- CONECTOR MAESTRO GOOGLE SHEETS (Previene Error CORS) ---
-const fetchAPI = async (payloadObj) => {
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    redirect: 'follow', // Obligatorio para Google Apps Script
-    headers: {
-      'Content-Type': 'text/plain;charset=utf-8', 
-    },
-    body: JSON.stringify(payloadObj)
-  });
-  if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-  const text = await response.text();
-  try {
-    const json = JSON.parse(text);
-    if (json.status === 'error') throw new Error(json.message);
-    return json;
-  } catch (e) {
-    throw new Error(`Respuesta inválida del backend. Actualiza Apps Script.`);
-  }
-};
-
-// --- MOCK DATA DE RESPALDO ---
-const INITIAL_INVENTORY = [
-  { id: 'H-1001', tipo: 'Hielera', estatus: 'CEDIS', ubicacion: 'Almacén A' },
-  { id: 'H-1002', tipo: 'Hielera', estatus: 'En Tienda', ubicacion: 'Tienda OXXO Sur' },
-  { id: 'P-5001', tipo: 'Placa', estatus: 'Dañada', ubicacion: 'Taller' },
-];
-
-const todayStr = new Date().toISOString().split('T')[0];
-const yesterdayDate = new Date(); yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
-const twoDaysAgoDate = new Date(); twoDaysAgoDate.setDate(twoDaysAgoDate.getDate() - 2);
-const twoDaysAgoStr = twoDaysAgoDate.toISOString().split('T')[0];
-
-const INITIAL_INCIDENTS = [
-  { id: 'INC-001', activoId: 'P-5001', tipo: 'Daño', descripcion: 'Fuga de líquido refrigerante', fecha: todayStr, usuario: 'operador1' }
-];
-
-const STORES = [
-  { id: 'T-01', nombre: 'Tienda OXXO Sur', direccion: 'Av. Siempre Viva 123', zona: 'Sur' },
-  { id: 'T-02', nombre: 'Super Gral. Norte', direccion: 'Calle Falsa 456', zona: 'Norte' },
-  { id: 'T-03', nombre: 'Tienda Express Centro', direccion: 'Reforma 789', zona: 'Centro' },
-];
-
-const INITIAL_USERS = [
-  { id: 'U-01', usuario: 'admin', nombre: 'Administrador Principal', rol: 'Superusuario' },
-  { id: 'U-02', usuario: 'operador1', nombre: 'Juan Pérez', rol: 'Operador' },
-  { id: 'U-03', usuario: 'operador2', nombre: 'María García', rol: 'Operador' }
-];
-
-const INITIAL_MOVEMENTS = [
-  { id: 'MOV-1', folio: 'S-1698420000000', fecha: `${twoDaysAgoStr} 08:30`, tipo: 'Salida', tienda: 'T-01', usuario: 'admin', activos: 'H-1002', grupo: '1', entregas: '3', pdf: '' },
-  { id: 'MOV-2', folio: 'E-1698430000000', fecha: `${yesterdayStr} 12:45`, tipo: 'Entrada', tienda: 'CEDIS', usuario: 'operador1', activos: 'P-5001, H-1005', grupo: '', entregas: '', pdf: '' },
-  { id: 'MOV-3', folio: 'S-1698440000000', fecha: `${todayStr} 09:15`, tipo: 'Salida', tienda: 'T-02', usuario: 'operador2', activos: 'H-2001, H-2002, P-3001', grupo: '2', entregas: '5', pdf: '' }
-];
-
-// --- COMPONENTE PRINCIPAL ---
-const App = () => {
-  const [view, setView] = useState('login'); 
-  const [user, setUser] = useState(null);
-  const [inventory, setInventory] = useState(INITIAL_INVENTORY);
-  const [incidents, setIncidents] = useState(INITIAL_INCIDENTS);
-  const [stores, setStores] = useState(STORES);
-  const [usersList, setUsersList] = useState(INITIAL_USERS);
-  const [movements, setMovements] = useState(INITIAL_MOVEMENTS);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (user) {
-      refreshData();
-    }
-  }, [user]);
-
-  const handleLogin = (e) => {
-    e.preventDefault();
-    setUser({ name: 'Operador Logístico', role: 'operador' });
-    setView('dashboard');
-  };
-
-  const refreshData = async () => {
-    setLoading(true);
-    try {
-      const result = await fetchAPI({ action: 'getDashboard' });
-      if (result && result.status === 'success') {
-        if (result.data) setInventory(result.data);
-        if (result.stores) setStores(result.stores);
-        if (result.users) setUsersList(result.users);
-        if (result.movements) setMovements(result.movements);
-        if (result.incidents) setIncidents(result.incidents); 
-      }
-    } catch (error) {
-      console.warn("Aviso de red (Sincronización):", error.message, "- Manteniendo datos locales.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (view === 'login') return <LoginScreen onLogin={handleLogin} />;
-
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
-      <div className="fixed bottom-4 right-4 z-50 flex gap-2">
-        <button 
-          onClick={() => setView('mobile')}
-          className={`p-3 rounded-full shadow-lg transition-all ${view === 'mobile' ? 'bg-orange-600 text-white' : 'bg-white text-orange-600 border border-orange-600'}`}
-          title="Modo Handheld RF"
-        >
-          <Scan size={24} />
-        </button>
-        <button 
-          onClick={() => setView('dashboard')}
-          className={`p-3 rounded-full shadow-lg transition-all ${view === 'dashboard' ? 'bg-blue-600 text-white' : 'bg-white text-blue-600 border border-blue-600'}`}
-          title="Dashboard PC"
-        >
-          <LayoutDashboard size={24} />
-        </button>
-      </div>
-
-      {view === 'mobile' ? 
-        <MobileHandheld user={user} setView={setView} onUpdate={refreshData} stores={stores} inventory={inventory} setInventory={setInventory} incidents={incidents} setIncidents={setIncidents} /> : 
-        <WebDashboard user={user} inventory={inventory} setInventory={setInventory} incidents={incidents} movements={movements} loading={loading} onRefresh={refreshData} setView={setView} stores={stores} setStores={setStores} usersList={usersList} setUsersList={setUsersList} />
-      }
-    </div>
-  );
-};
-
-// --- PANTALLA DE LOGIN ---
-const LoginScreen = ({ onLogin }) => (
-  <div className="flex items-center justify-center min-h-screen bg-slate-900 px-4">
-    <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 border-blue-600">
-      <div className="flex flex-col items-center mb-8">
-        <div className="bg-blue-600 p-4 rounded-xl mb-4 shadow-lg">
-          <Truck className="text-white" size={40} />
-        </div>
-        <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Hieleras System</h1>
-        <p className="text-slate-500 text-sm font-medium">Control de Inventario RF</p>
-      </div>
-      <form onSubmit={onLogin} className="space-y-4">
-        <div>
-          <label className="block text-[10px] font-black text-slate-500 mb-1 uppercase tracking-widest">Identificador Usuario</label>
-          <input type="text" defaultValue="admin" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
-        </div>
-        <div>
-          <label className="block text-[10px] font-black text-slate-500 mb-1 uppercase tracking-widest">PIN de Acceso</label>
-          <input type="password" defaultValue="123456" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
-        </div>
-        <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl transition-all shadow-xl uppercase tracking-wider mt-4">
-          Iniciar Sesión
-        </button>
-      </form>
-    </div>
-  </div>
-);
-
-// --- HANDHELD (INTERFAZ RF) ---
-const MobileHandheld = ({ user, setView, onUpdate, stores, inventory, setInventory, incidents, setIncidents }) => {
-  const [screen, setScreen] = useState('menu'); 
-  const [scannedItems, setScannedItems] = useState([]);
-  const [inputCode, setInputCode] = useState('');
-  const [selectedStore, setSelectedStore] = useState('');
-  const [grupo, setGrupo] = useState(''); 
-  const [entregas, setEntregas] = useState(''); 
-  const [incidentType, setIncidentType] = useState('Dañada');
-  const [incidentDesc, setIncidentDesc] = useState('');
-  const [statusMessage, setStatusMessage] = useState(null);
-  const [isSyncing, setIsSyncing] = useState(false);
-
-  const addScan = (code) => {
-    if (!code) return;
-    const cleanCode = code.trim().toUpperCase();
-    if (scannedItems.includes(cleanCode)) {
-      setStatusMessage({ type: 'error', text: 'DUPLICADO' });
-      return;
-    }
-    setScannedItems([...scannedItems, cleanCode]);
-    setInputCode('');
-    setStatusMessage({ type: 'success', text: `OK: ${cleanCode}` });
-    setTimeout(() => setStatusMessage(null), 800);
-  };
-
-  const resetForm = () => {
-    setScannedItems([]);
-    setIncidentDesc('');
-    setGrupo('');
-    setEntregas('');
-    setScreen('menu');
-  };
-
-  const handleConfirm = async () => {
-    if (scannedItems.length === 0) return;
-    
-    setIsSyncing(true);
-    setStatusMessage({ type: 'info', text: 'ENVIANDO...' });
-
-    if (screen === 'incidencia') {
-      try {
-        const result = await fetchAPI({
-          action: 'registrarIncidencia',
-          payload: {
-            tipo: incidentType === 'Dañada' ? 'Daño' : 'Pérdida',
-            descripcion: incidentDesc || 'Reportado vía RF',
-            usuario: user.name,
-            activos: scannedItems
-          }
-        });
-
-        if (result && result.status === 'success') {
-          setStatusMessage({ type: 'success', text: 'INCIDENCIA REGISTRADA' });
-          setTimeout(() => {
-            resetForm();
-            onUpdate(); 
-          }, 1500);
-        } else {
-          throw new Error(result?.message || "Error en servidor");
-        }
-      } catch (error) {
-         console.warn("Fallo en red de entorno. Usando Fallback local:", error.message);
-         const newIncidents = scannedItems.map((id, index) => ({
-           id: `INC-${Date.now()}-${index}`,
-           activoId: id,
-           tipo: incidentType === 'Dañada' ? 'Daño' : 'Pérdida',
-           descripcion: incidentDesc || 'Reportado vía RF',
-           fecha: new Date().toISOString().split('T')[0],
-           usuario: user.name
-         }));
-         setIncidents([...incidents, ...newIncidents]);
-         
-         const updatedInventory = inventory.map(item => {
-           if (scannedItems.includes(item.id)) {
-             return { ...item, estatus: incidentType };
-           }
-           return item;
-         });
-         setInventory(updatedInventory);
-
-         setStatusMessage({ type: 'success', text: 'GUARDADO (LOCAL)' });
-         setTimeout(() => {
-           resetForm();
-         }, 1500);
-      } finally {
-        setIsSyncing(false);
-      }
-      return;
-    }
-
-    try {
-      const result = await fetchAPI({
-        action: 'registrarMovimiento',
-        payload: {
-          tipo: screen === 'salida' ? 'Salida' : 'Entrada',
-          tienda: selectedStore || 'CEDIS',
-          usuario: user.name,
-          activos: scannedItems,
-          grupo: screen === 'salida' ? grupo : '', 
-          entregas: screen === 'salida' ? entregas : '' 
-        }
-      });
-
-      if (result && result.status === 'success') {
-        setStatusMessage({ type: 'success', text: 'ÉXITO: GUARDADO' });
-        setTimeout(() => {
-          resetForm();
-          onUpdate();
-        }, 1500);
-      }
-    } catch (error) {
-      setStatusMessage({ type: 'error', text: 'ERROR DE RED' });
-      alert(`❌ Error de conexión: ${error.message}`);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  return (
-    <div className="max-w-md mx-auto h-screen bg-slate-950 flex flex-col text-white shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-      <div className="p-4 bg-slate-900 border-b-2 border-slate-800 flex justify-between items-center">
-        <div>
-          <p className="text-[10px] text-slate-500 font-black uppercase italic">Handheld Terminal</p>
-          <h2 className="font-black text-xl tracking-tighter text-orange-500">
-            {screen === 'menu' ? 'LOGÍSTICA' : screen === 'salida' ? 'DESPACHO' : 'RETORNO'}
-          </h2>
-        </div>
-        <button onClick={() => setView('login')} className="p-2 bg-slate-800 rounded-lg text-slate-400">
-          <LogOut size={20} />
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {statusMessage && (
-          <div className={`p-5 rounded-xl font-black text-center text-2xl shadow-lg animate-bounce ${
-            statusMessage.type === 'error' ? 'bg-red-600' : 
-            statusMessage.type === 'info' ? 'bg-blue-600' : 'bg-green-600'
-          }`}>
-            {statusMessage.text}
-          </div>
-        )}
-
-        {screen === 'menu' && (
-          <div className="flex flex-col gap-4 py-4">
-            <button onClick={() => setScreen('salida')} className="bg-orange-600 p-6 rounded-3xl flex flex-col items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_8px_0_rgb(154,52,18)] border-2 border-orange-400">
-              <Truck size={40} />
-              <span className="font-black text-xl tracking-tight">SALIDA TIENDA</span>
-            </button>
-            <button onClick={() => setScreen('entrada')} className="bg-blue-600 p-6 rounded-3xl flex flex-col items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_8px_0_rgb(29,78,216)] border-2 border-blue-400">
-              <Package size={40} />
-              <span className="font-black text-xl tracking-tight">ENTRADA CEDIS</span>
-            </button>
-            <button onClick={() => setScreen('incidencia')} className="bg-red-600 p-6 rounded-3xl flex flex-col items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_8px_0_rgb(185,28,28)] border-2 border-red-400">
-              <AlertOctagon size={40} />
-              <span className="font-black text-xl tracking-tight">REPORTAR INCIDENCIA</span>
-            </button>
-          </div>
-        )}
-
-        {(screen === 'salida' || screen === 'entrada' || screen === 'incidencia') && (
-          <div className="space-y-4">
-            {screen === 'salida' && (
-              <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-4">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase">Destino de Carga:</label>
-                  <select 
-                    className="w-full bg-slate-800 p-4 rounded-xl border-2 border-slate-700 text-xl font-black outline-none focus:border-orange-500 appearance-none"
-                    onChange={(e) => setSelectedStore(e.target.value)}
-                    value={selectedStore}
-                  >
-                    <option value="">-- ELIGE DESTINO --</option>
-                    {stores.map((s, idx) => <option key={`store-opt-${s.id}-${idx}`} value={s.id}>{s.nombre}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase">Grupo(s):</label>
-                  <input 
-                    type="text" 
-                    value={grupo}
-                    onChange={(e) => setGrupo(e.target.value)}
-                    placeholder="Ej. 1, 2, 3"
-                    className="w-full bg-slate-800 p-4 rounded-xl border-2 border-slate-700 text-lg font-black outline-none focus:border-orange-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase">Entrega(s):</label>
-                  <input 
-                    type="text" 
-                    value={entregas}
-                    onChange={(e) => setEntregas(e.target.value)}
-                    placeholder="Ej. 5, 8, 12"
-                    className="w-full bg-slate-800 p-4 rounded-xl border-2 border-slate-700 text-lg font-black outline-none focus:border-orange-500"
-                  />
-                </div>
-              </div>
-            )}
-
-            {screen === 'incidencia' && (
-              <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-4">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase">Tipo de Incidencia:</label>
-                  <select 
-                    className="w-full bg-slate-800 p-4 rounded-xl border-2 border-slate-700 text-xl font-black outline-none focus:border-red-500 appearance-none text-red-400"
-                    onChange={(e) => setIncidentType(e.target.value)}
-                    value={incidentType}
-                  >
-                    <option value="Dañada">Activo Dañado / Roto</option>
-                    <option value="Perdida">Activo Perdido / Robado</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase">Detalles (Opcional):</label>
-                  <input 
-                    type="text" 
-                    value={incidentDesc}
-                    onChange={(e) => setIncidentDesc(e.target.value)}
-                    placeholder="Escriba un detalle..."
-                    className="w-full bg-slate-800 border-2 border-slate-700 p-3 rounded-xl text-sm font-bold focus:border-red-500 outline-none"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="bg-slate-900 p-5 rounded-2xl border-2 border-slate-800">
-              <div className="flex justify-between items-center mb-2">
-                <label className={`block text-[10px] font-black uppercase ${screen === 'incidencia' ? 'text-red-500' : 'text-orange-500'}`}>Esperando Escaneo...</label>
-                <Scan size={16} className={`${screen === 'incidencia' ? 'text-red-500' : 'text-orange-500'} animate-pulse`} />
-              </div>
-              <input 
-                type="text" 
-                value={inputCode}
-                onChange={(e) => setInputCode(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && addScan(inputCode)}
-                className={`w-full bg-black border-2 border-slate-700 p-5 rounded-xl text-4xl font-mono font-bold ${screen === 'incidencia' ? 'text-red-400 focus:border-red-500' : 'text-green-400 focus:border-green-500'} outline-none uppercase tracking-widest shadow-inner`}
-                autoFocus
-                placeholder="..."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between items-center px-1">
-                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">Activos: {scannedItems.length}</h3>
-                <button onClick={() => setScannedItems([])} className="text-[10px] text-red-500 font-black uppercase hover:underline">Limpiar</button>
-              </div>
-              <div className="bg-black/50 rounded-2xl max-h-[35vh] overflow-y-auto divide-y divide-slate-800 border border-slate-800 shadow-inner">
-                {scannedItems.length === 0 ? (
-                  <div className="p-12 text-center">
-                    <ClipboardList className="mx-auto text-slate-800 mb-2" size={48} />
-                    <p className="text-xs text-slate-700 font-bold uppercase italic tracking-widest">Lista Vacía</p>
-                  </div>
-                ) : (
-                  scannedItems.map((code, idx) => (
-                    <div key={`scan-${code}-${idx}`} className="p-4 flex justify-between items-center animate-in slide-in-from-left duration-200">
-                      <span className="font-mono text-2xl font-black tracking-tighter text-slate-200">{code}</span>
-                      <div className="bg-green-600/20 p-1 rounded-full text-green-500">
-                        <CheckCircle2 size={24} />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {(screen === 'salida' || screen === 'entrada' || screen === 'incidencia') && (
-        <div className="p-4 bg-slate-900 grid grid-cols-2 gap-4 border-t-2 border-slate-800">
-          <button 
-            onClick={resetForm}
-            disabled={isSyncing}
-            className="p-5 bg-slate-800 font-black rounded-2xl uppercase text-xs tracking-widest active:scale-95 transition-all disabled:opacity-50"
-          >
-            ATRÁS
-          </button>
-          <button 
-            onClick={handleConfirm}
-            disabled={scannedItems.length === 0 || (screen === 'salida' && !selectedStore) || isSyncing}
-            className={`p-5 font-black rounded-2xl uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2 transition-all ${
-              scannedItems.length > 0 && !isSyncing 
-                ? screen === 'incidencia' ? 'bg-red-600 text-white active:scale-95 shadow-[0_4px_0_rgb(153,27,27)]' : 'bg-green-600 text-white active:scale-95 shadow-[0_4px_0_rgb(22,101,52)]' 
-                : 'bg-slate-700 text-slate-400 cursor-not-allowed'
-            }`}
-          >
-            {isSyncing ? <Loader2 className="animate-spin" size={18} /> : 'GUARDAR'}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// --- WEB DASHBOARD ---
-const WebDashboard = ({ user, inventory, setInventory, incidents, movements, loading, onRefresh, setView, stores, setStores, usersList, setUsersList }) => {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [showModal, setShowModal] = useState(null); 
-  const [isSaving, setIsSaving] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const changeTab = (tab) => {
-    setActiveTab(tab);
-    setSearchTerm(''); 
-  };
-
-  // Separación estricta de Placas y Hieleras
-  const stats = useMemo(() => {
-    const getStats = (tipo) => {
-      const filtered = inventory.filter(i => i.tipo === tipo);
-      return {
-        total: filtered.length,
-        enCedis: filtered.filter(i => i.estatus === 'CEDIS').length,
-        enTienda: filtered.filter(i => i.estatus === 'En Tienda').length,
-        dañadas: filtered.filter(i => i.estatus === 'Dañada' || i.estatus === 'Perdida').length
-      };
-    };
-    return {
-      hieleras: getStats('Hielera'),
-      placas: getStats('Placa')
-    };
-  }, [inventory]);
-
-  const zonesStock = useMemo(() => {
-    const uniqueZones = [...new Set(stores.map(s => s.zona).filter(Boolean))];
-    
-    return uniqueZones.map(zona => {
-      const storesInZone = stores.filter(s => s.zona === zona);
-      const storeNames = storesInZone.map(s => s.nombre);
-      const storeIds = storesInZone.map(s => s.id);
-      
-      const stock = inventory.filter(item => 
-        (storeNames.includes(item.ubicacion) || storeIds.includes(item.ubicacion)) && 
-        item.estatus === 'En Tienda'
-      ).length;
-      
-      return { zona, stock };
-    }).sort((a, b) => b.stock - a.stock);
-  }, [stores, inventory]);
-
-  const chartData = useMemo(() => {
-    const activityMap = {};
-    
-    movements.forEach(m => {
-      if (!m.fecha) return;
-      const date = String(m.fecha).split(' ')[0]; 
-      const numAssets = m.activos ? String(m.activos).split(',').length : 0;
-      activityMap[date] = (activityMap[date] || 0) + numAssets;
-    });
-
-    const sortedDates = Object.keys(activityMap).sort();
-    let endDate = new Date();
-    
-    if (sortedDates.length > 0) {
-      const lastDateStr = sortedDates[sortedDates.length - 1];
-      const parts = lastDateStr.split('-');
-      if (parts.length === 3) {
-        endDate = new Date(parts[0], parts[1] - 1, parts[2]);
-      }
-    }
-
-    const dataItems = [];
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(endDate);
-      d.setDate(d.getDate() - i);
-      
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      
-      const dateKey = `${year}-${month}-${day}`;
-      const label = `${day}/${month}`;
-      
-      dataItems.push({
-        label: label,
-        value: activityMap[dateKey] || 0
-      });
-    }
-
-    const maxValue = Math.max(...dataItems.map(d => d.value), 10); 
-    
-    return dataItems.map(d => ({
-      ...d,
-      height: Math.max((d.value / maxValue) * 100, d.value > 0 ? 5 : 0) 
-    }));
-  }, [movements]);
-
-  // --- LÓGICA DE FILTRADO PARA TABLAS ---
-  const lowerSearch = searchTerm.toLowerCase();
+  <!-- React & ReactDOM (Usando CDNJS por mayor estabilidad) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
   
-  const filteredInventory = inventory.filter(i => 
-    (i.id && String(i.id).toLowerCase().includes(lowerSearch)) || 
-    (i.tipo && String(i.tipo).toLowerCase().includes(lowerSearch)) || 
-    (i.ubicacion && String(i.ubicacion).toLowerCase().includes(lowerSearch))
-  );
+  <!-- FIX CRÍTICO: Asegurar que React está globalmente disponible antes de cargar Lucide -->
+  <script>
+    window.react = window.React;
+  </script>
 
-  const filteredStores = stores.filter(s => 
-    (s.id && String(s.id).toLowerCase().includes(lowerSearch)) || 
-    (s.nombre && String(s.nombre).toLowerCase().includes(lowerSearch)) || 
-    (s.zona && String(s.zona).toLowerCase().includes(lowerSearch)) || 
-    (s.direccion && String(s.direccion).toLowerCase().includes(lowerSearch))
-  );
+  <!-- Babel para compilar JSX en el navegador -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.3/babel.min.js" crossorigin></script>
 
-  const filteredUsers = usersList.filter(u => 
-    (u.id && String(u.id).toLowerCase().includes(lowerSearch)) || 
-    (u.nombre && String(u.nombre).toLowerCase().includes(lowerSearch)) || 
-    (u.usuario && String(u.usuario).toLowerCase().includes(lowerSearch)) || 
-    (u.rol && String(u.rol).toLowerCase().includes(lowerSearch))
-  );
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide-react@0.292.0/dist/umd/lucide-react.min.js" crossorigin></script>
 
-  const filteredIncidents = incidents.filter(inc => 
-    (inc.id && String(inc.id).toLowerCase().includes(lowerSearch)) || 
-    (inc.activoId && String(inc.activoId).toLowerCase().includes(lowerSearch)) || 
-    (inc.descripcion && String(inc.descripcion).toLowerCase().includes(lowerSearch)) || 
-    (inc.tipo && String(inc.tipo).toLowerCase().includes(lowerSearch))
-  );
+  <style>
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-900">
+  
+  <!-- Contenedor principal -->
+  <div id="root"></div>
 
-  const filteredMovements = movements.filter(m => 
-    (m.folio && String(m.folio).toLowerCase().includes(lowerSearch)) || 
-    (m.usuario && String(m.usuario).toLowerCase().includes(lowerSearch)) || 
-    (m.tienda && String(m.tienda).toLowerCase().includes(lowerSearch)) || 
-    (m.activos && String(m.activos).toLowerCase().includes(lowerSearch)) || 
-    (m.tipo && String(m.tipo).toLowerCase().includes(lowerSearch)) ||
-    (m.grupo && String(m.grupo).toLowerCase().includes(lowerSearch)) || 
-    (m.entregas && String(m.entregas).toLowerCase().includes(lowerSearch)) 
-  );
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+    
+    // --- LÓGICA DE ICONOS A PRUEBA DE FALLOS ---
+    const iconsLib = window.lucideReact || window.LucideReact || {};
+    
+    // Si el icono falla, pinta un SVG circular de respaldo para evitar el error "is not a function"
+    const getIcon = (name) => {
+      if (iconsLib[name]) return iconsLib[name];
+      return ({size=24, className=""}) => (
+        <svg width={size} height={size} className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10"></circle>
+        </svg>
+      );
+    };
 
-  const handleDownloadExcel = () => {
-    let dataToExport = [];
-    let headers = [];
-    let filename = `reporte_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`;
+    const LayoutDashboard = getIcon('LayoutDashboard');
+    const Truck = getIcon('Truck');
+    const Package = getIcon('Package');
+    const BarChart3 = getIcon('BarChart3');
+    const Settings = getIcon('Settings');
+    const LogOut = getIcon('LogOut');
+    const Scan = getIcon('Scan');
+    const CheckCircle2 = getIcon('CheckCircle2');
+    const AlertTriangle = getIcon('AlertTriangle');
+    const FileText = getIcon('FileText');
+    const Users = getIcon('Users');
+    const Search = getIcon('Search');
+    const Filter = getIcon('Filter');
+    const ArrowRightLeft = getIcon('ArrowRightLeft');
+    const ChevronRight = getIcon('ChevronRight');
+    const ClipboardList = getIcon('ClipboardList');
+    const Loader2 = getIcon('Loader2');
+    const Store = getIcon('Store');
+    const UserPlus = getIcon('UserPlus');
+    const Plus = getIcon('Plus');
+    const X = getIcon('X');
+    const AlertOctagon = getIcon('AlertOctagon');
+    const Download = getIcon('Download');
 
-    switch (activeTab) {
-      case 'inventory':
-        headers = ['ID Activo', 'Clasificación', 'Estatus Operativo', 'Ubicación Última'];
-        dataToExport = filteredInventory.map(item => [item.id, item.tipo, item.estatus, item.ubicacion]);
-        break;
-      case 'stores':
-        headers = ['ID Tienda', 'Nombre', 'Dirección', 'Zona'];
-        dataToExport = filteredStores.map(s => [s.id, s.nombre, s.direccion, s.zona]);
-        break;
-      case 'users':
-        headers = ['ID Usuario', 'Nombre Completo', 'Credencial', 'Nivel'];
-        dataToExport = filteredUsers.map(u => [u.id, u.nombre, u.usuario, u.rol]);
-        break;
-      case 'incidents':
-        headers = ['ID Incidencia', 'Activo', 'Tipo', 'Detalles', 'Fecha', 'Usuario'];
-        dataToExport = filteredIncidents.map(inc => [inc.id, inc.activoId, inc.tipo, inc.descripcion, inc.fecha, inc.usuario]);
-        break;
-      case 'moves':
-        headers = ['Folio de Operación', 'Fecha y Hora', 'Tipo', 'Destino / Origen', 'Usuario', 'Grupo', 'Entregas', 'Activos Movidos', 'PDF'];
-        dataToExport = filteredMovements.map(m => [m.folio, m.fecha, m.tipo, m.tienda, m.usuario, m.grupo || '', m.entregas || '', m.activos, m.pdf || '']);
-        break;
-      default:
-        alert('Navega a Inventario, Tiendas, Usuarios, Incidencias o Histórico para descargar su tabla correspondiente.');
-        return;
-    }
+    // --- CONFIGURACIÓN DE API (Tu enlace más reciente) ---
+    const API_URL = "https://script.google.com/macros/s/AKfycbzcUOt003D02aKsQF8K_693RTBN3HdX_45Pn9Dg3MloxKrIElfwi-2xEtG9vPkuokVywQ/exec";
 
-    const csvContent = [
-      headers.join(','),
-      ...dataToExport.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
+    // --- CONECTOR MAESTRO GOOGLE SHEETS ---
+    const fetchAPI = async (payloadObj) => {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        redirect: 'follow', 
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8', 
+        },
+        body: JSON.stringify(payloadObj)
+      });
+      if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+      const text = await response.text();
+      try {
+        const json = JSON.parse(text);
+        if (json.status === 'error') throw new Error(json.message);
+        return json;
+      } catch (e) {
+        throw new Error(`Respuesta inválida del backend. Actualiza Apps Script.`);
+      }
+    };
 
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+    // --- MOCK DATA DE RESPALDO ---
+    const INITIAL_INVENTORY = [
+      { id: 'H-1001', tipo: 'Hielera', estatus: 'CEDIS', ubicacion: 'Almacén A' },
+      { id: 'H-1002', tipo: 'Hielera', estatus: 'En Tienda', ubicacion: 'Tienda OXXO Sur' },
+      { id: 'P-5001', tipo: 'Placa', estatus: 'Dañada', ubicacion: 'Taller' },
+    ];
 
-  return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden w-full">
-      <aside className="w-72 bg-slate-900 text-white flex flex-col shadow-2xl z-20">
-        <div className="p-8 border-b border-slate-800">
-          <div className="flex items-center gap-4">
-            <div className="bg-blue-600 p-3 rounded-2xl shadow-[0_4px_20px_rgba(37,99,235,0.4)]">
-              <Truck size={28} />
+    const todayStr = new Date().toISOString().split('T')[0];
+    const yesterdayDate = new Date(); yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+    const twoDaysAgoDate = new Date(); twoDaysAgoDate.setDate(twoDaysAgoDate.getDate() - 2);
+    const twoDaysAgoStr = twoDaysAgoDate.toISOString().split('T')[0];
+
+    const INITIAL_INCIDENTS = [
+      { id: 'INC-001', activoId: 'P-5001', tipo: 'Daño', descripcion: 'Fuga de líquido refrigerante', fecha: todayStr, usuario: 'operador1' }
+    ];
+
+    const STORES = [
+      { id: 'T-01', nombre: 'Tienda OXXO Sur', direccion: 'Av. Siempre Viva 123', zona: 'Sur' },
+      { id: 'T-02', nombre: 'Super Gral. Norte', direccion: 'Calle Falsa 456', zona: 'Norte' },
+      { id: 'T-03', nombre: 'Tienda Express Centro', direccion: 'Reforma 789', zona: 'Centro' },
+    ];
+
+    const INITIAL_USERS = [
+      { id: 'U-01', usuario: 'admin', nombre: 'Administrador Principal', rol: 'Superusuario' },
+      { id: 'U-02', usuario: 'operador1', nombre: 'Juan Pérez', rol: 'Operador' },
+      { id: 'U-03', usuario: 'operador2', nombre: 'María García', rol: 'Operador' }
+    ];
+
+    const INITIAL_MOVEMENTS = [
+      { id: 'MOV-1', folio: 'S-1698420000000', fecha: `${twoDaysAgoStr} 08:30`, tipo: 'Salida', tienda: 'T-01', usuario: 'admin', activos: 'H-1002', grupo: '1', entregas: '3', pdf: '' },
+      { id: 'MOV-2', folio: 'E-1698430000000', fecha: `${yesterdayStr} 12:45`, tipo: 'Entrada', tienda: 'CEDIS', usuario: 'operador1', activos: 'P-5001, H-1005', grupo: '', entregas: '', pdf: '' },
+      { id: 'MOV-3', folio: 'S-1698440000000', fecha: `${todayStr} 09:15`, tipo: 'Salida', tienda: 'T-02', usuario: 'operador2', activos: 'H-2001, H-2002, P-3001', grupo: '2', entregas: '5', pdf: '' }
+    ];
+
+    // --- COMPONENTE PRINCIPAL ---
+    const App = () => {
+      const [view, setView] = useState('login'); 
+      const [user, setUser] = useState(null);
+      const [inventory, setInventory] = useState(INITIAL_INVENTORY);
+      const [incidents, setIncidents] = useState(INITIAL_INCIDENTS);
+      const [stores, setStores] = useState(STORES);
+      const [usersList, setUsersList] = useState(INITIAL_USERS);
+      const [movements, setMovements] = useState(INITIAL_MOVEMENTS);
+      const [loading, setLoading] = useState(false);
+
+      useEffect(() => {
+        if (user) {
+          refreshData();
+        }
+      }, [user]);
+
+      const handleLogin = (e) => {
+        e.preventDefault();
+        setUser({ name: 'Operador Logístico', role: 'operador' });
+        setView('dashboard');
+      };
+
+      const refreshData = async () => {
+        setLoading(true);
+        try {
+          const result = await fetchAPI({ action: 'getDashboard' });
+          if (result && result.status === 'success') {
+            if (result.data) setInventory(result.data);
+            if (result.stores) setStores(result.stores);
+            if (result.users) setUsersList(result.users);
+            if (result.movements) setMovements(result.movements);
+            if (result.incidents) setIncidents(result.incidents); 
+          }
+        } catch (error) {
+          console.warn("Aviso de red (Sincronización):", error.message, "- Manteniendo datos locales.");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      if (view === 'login') return <LoginScreen onLogin={handleLogin} />;
+
+      return (
+        <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+          <div className="fixed bottom-4 right-4 z-50 flex gap-2">
+            <button 
+              onClick={() => setView('mobile')}
+              className={`p-3 rounded-full shadow-lg transition-all ${view === 'mobile' ? 'bg-orange-600 text-white' : 'bg-white text-orange-600 border border-orange-600'}`}
+              title="Modo Handheld RF"
+            >
+              <Scan size={24} />
+            </button>
+            <button 
+              onClick={() => setView('dashboard')}
+              className={`p-3 rounded-full shadow-lg transition-all ${view === 'dashboard' ? 'bg-blue-600 text-white' : 'bg-white text-blue-600 border border-blue-600'}`}
+              title="Dashboard PC"
+            >
+              <LayoutDashboard size={24} />
+            </button>
+          </div>
+
+          {view === 'mobile' ? 
+            <MobileHandheld user={user} setView={setView} onUpdate={refreshData} stores={stores} inventory={inventory} setInventory={setInventory} incidents={incidents} setIncidents={setIncidents} /> : 
+            <WebDashboard user={user} inventory={inventory} setInventory={setInventory} incidents={incidents} movements={movements} loading={loading} onRefresh={refreshData} setView={setView} stores={stores} setStores={setStores} usersList={usersList} setUsersList={setUsersList} />
+          }
+        </div>
+      );
+    };
+
+    // --- PANTALLA DE LOGIN ---
+    const LoginScreen = ({ onLogin }) => (
+      <div className="flex items-center justify-center min-h-screen bg-slate-900 px-4">
+        <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 border-blue-600">
+          <div className="flex flex-col items-center mb-8">
+            <div className="bg-blue-600 p-4 rounded-xl mb-4 shadow-lg">
+              <Truck className="text-white" size={40} />
+            </div>
+            <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Hieleras System</h1>
+            <p className="text-slate-500 text-sm font-medium">Control de Inventario RF</p>
+          </div>
+          <form onSubmit={onLogin} className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 mb-1 uppercase tracking-widest">Identificador Usuario</label>
+              <input type="text" defaultValue="admin" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
             </div>
             <div>
-              <span className="font-black text-2xl tracking-tighter uppercase block leading-none">Hieleras</span>
-              <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Admin Panel v2</span>
+              <label className="block text-[10px] font-black text-slate-500 mb-1 uppercase tracking-widest">PIN de Acceso</label>
+              <input type="password" defaultValue="123456" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
             </div>
-          </div>
-        </div>
-        
-        <nav className="flex-1 p-6 space-y-3 overflow-y-auto">
-          <NavItem icon={<LayoutDashboard size={22}/>} label="General" active={activeTab === 'overview'} onClick={() => changeTab('overview')} />
-          <NavItem icon={<Package size={22}/>} label="Inventario" active={activeTab === 'inventory'} onClick={() => changeTab('inventory')} />
-          <NavItem icon={<Store size={22}/>} label="Tiendas" active={activeTab === 'stores'} onClick={() => changeTab('stores')} />
-          <NavItem icon={<Users size={22}/>} label="Usuarios" active={activeTab === 'users'} onClick={() => changeTab('users')} />
-          <NavItem icon={<AlertOctagon size={22}/>} label="Incidencias" active={activeTab === 'incidents'} onClick={() => changeTab('incidents')} />
-          <NavItem icon={<ArrowRightLeft size={22}/>} label="Histórico" active={activeTab === 'moves'} onClick={() => changeTab('moves')} />
-        </nav>
-
-        <div className="p-6 border-t border-slate-800 space-y-4">
-          <button 
-            onClick={onRefresh} 
-            disabled={loading} 
-            className="w-full flex items-center justify-center gap-3 p-4 bg-blue-600/10 text-blue-400 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-600/20 transition-all border border-blue-600/30 disabled:opacity-50"
-          >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : <ArrowRightLeft size={16} />} 
-            Sync Google Sheets
-          </button>
-          
-          <div className="flex items-center justify-between gap-2 p-4 bg-slate-800/40 rounded-2xl border border-slate-800">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-black text-sm shadow-lg">AD</div>
-              <div className="overflow-hidden">
-                <p className="font-black text-slate-200 text-sm truncate uppercase tracking-tight">{user.name}</p>
-                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Superusuario</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => setView('login')} 
-              className="p-3 bg-slate-700/50 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-xl transition-all"
-              title="Cerrar Sesión"
-            >
-              <LogOut size={18} />
+            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl transition-all shadow-xl uppercase tracking-wider mt-4">
+              Iniciar Sesión
             </button>
-          </div>
-        </div>
-      </aside>
-
-      <main className="flex-1 p-10 overflow-y-auto">
-        <header className="flex justify-between items-end mb-12">
-          <div>
-            <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-2">
-              {activeTab === 'overview' && 'Resumen de Flota'}
-              {activeTab === 'inventory' && 'Inventario Activo'}
-              {activeTab === 'stores' && 'Catálogo de Tiendas'}
-              {activeTab === 'users' && 'Gestión de Usuarios'}
-              {activeTab === 'incidents' && 'Registro de Incidencias'}
-              {activeTab === 'moves' && 'Bitácora Logística'}
-            </h1>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Sincronización Activa con Sheets</p>
-            </div>
-          </div>
-          <div className="flex gap-4">
-            <button onClick={handleDownloadExcel} className="bg-white border-2 border-slate-200 text-slate-700 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
-              <Download size={16} /> Descargar CSV
-            </button>
-            {activeTab === 'inventory' && (
-              <button onClick={() => setShowModal('item')} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl flex items-center gap-2">
-                <Plus size={16} /> Nuevo Activo
-              </button>
-            )}
-            {activeTab === 'stores' && (
-              <button onClick={() => setShowModal('store')} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl flex items-center gap-2">
-                <Plus size={16} /> Nueva Tienda
-              </button>
-            )}
-            {activeTab === 'users' && (
-              <button onClick={() => setShowModal('user')} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl flex items-center gap-2">
-                <Plus size={16} /> Nuevo Usuario
-              </button>
-            )}
-          </div>
-        </header>
-
-        {activeTab === 'overview' && (
-          <div className="space-y-10">
-            <div className="space-y-4">
-              <h3 className="font-black text-slate-500 uppercase tracking-widest text-xs flex items-center gap-2">
-                <Package size={16} className="text-blue-500" /> Resumen de Hieleras
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                <StatCard label="Total Hieleras" value={stats.hieleras.total} icon={<Package className="text-blue-600"/>} color="blue" />
-                <StatCard label="Stock CEDIS" value={stats.hieleras.enCedis} icon={<CheckCircle2 className="text-green-600"/>} color="green" />
-                <StatCard label="En Tiendas" value={stats.hieleras.enTienda} icon={<Truck className="text-orange-600"/>} color="orange" />
-                <StatCard label="Fuera de Servicio" value={stats.hieleras.dañadas} icon={<AlertTriangle className="text-red-600"/>} color="red" />
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h3 className="font-black text-slate-500 uppercase tracking-widest text-xs flex items-center gap-2">
-                <Package size={16} className="text-indigo-500" /> Resumen de Placas
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                <StatCard label="Total Placas" value={stats.placas.total} icon={<Package className="text-indigo-600"/>} color="blue" />
-                <StatCard label="Stock CEDIS" value={stats.placas.enCedis} icon={<CheckCircle2 className="text-green-600"/>} color="green" />
-                <StatCard label="En Tiendas" value={stats.placas.enTienda} icon={<Truck className="text-orange-600"/>} color="orange" />
-                <StatCard label="Fuera de Servicio" value={stats.placas.dañadas} icon={<AlertTriangle className="text-red-600"/>} color="red" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-              <div className="lg:col-span-2 bg-white p-10 rounded-3xl border-2 border-slate-100 shadow-sm">
-                <h3 className="font-black text-slate-800 uppercase tracking-tight text-xl italic mb-10">Volumen de Movimientos por Fecha</h3>
-                <div className="h-72 flex items-end justify-between gap-6 px-4">
-                  {chartData.map((item, i) => (
-                    <div key={`chart-col-${i}`} className="flex-1 flex flex-col items-center gap-3 group relative">
-                      <div className="w-full bg-slate-50 rounded-2xl relative flex flex-col justify-end h-full overflow-hidden border border-slate-100">
-                        <div className="bg-gradient-to-t from-blue-700 to-blue-500 rounded-2xl w-full transition-all duration-1000 group-hover:brightness-110" style={{ height: `${item.height}%` }}></div>
-                        
-                        {item.value > 0 && (
-                          <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] py-1 px-2 rounded-lg font-black opacity-0 group-hover:opacity-100 transition-all shadow-xl z-10 pointer-events-none">
-                            {item.value} ud.
-                          </div>
-                        )}
-                      </div>
-                      <span className="text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">{item.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="bg-white p-10 rounded-3xl border-2 border-slate-100 shadow-sm">
-                <h3 className="font-black text-slate-800 uppercase tracking-tight text-xl italic mb-8">Stock por Zona</h3>
-                <div className="space-y-8 overflow-y-auto max-h-64 pr-2">
-                  {zonesStock.length === 0 ? (
-                    <p className="text-slate-400 text-sm font-bold">No hay zonas registradas</p>
-                  ) : zonesStock.map((z, i) => {
-                    const maxStock = Math.max(...zonesStock.map(st => st.stock), 1);
-                    const width = Math.max((z.stock / maxStock) * 100, 5);
-                    return (
-                      <div key={`zone-stock-${z.zona}-${i}`} className="space-y-3">
-                        <div className="flex justify-between text-[11px] font-black uppercase tracking-tighter">
-                          <span className="text-slate-600 truncate pr-2">Zona {z.zona}</span>
-                          <span className="text-blue-600 shrink-0">{z.stock} UNI</span>
-                        </div>
-                        <div className="h-3 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                          <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-500 rounded-full" style={{ width: `${width}%` }}></div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'inventory' && (
-          <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
-            <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-5 top-4 text-slate-400" size={20} />
-                <input 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar por ID, Tipo o Ubicación..." 
-                  className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
-                />
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
-                  <tr>
-                    <th className="px-10 py-6">ID Activo</th>
-                    <th className="px-10 py-6">Clasificación</th>
-                    <th className="px-10 py-6">Estatus Operativo</th>
-                    <th className="px-10 py-6">Ubicación Última</th>
-                    <th className="px-10 py-6 text-right">Detalles</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y-2 divide-slate-50 text-sm">
-                  {filteredInventory.length === 0 ? (
-                    <tr><td colSpan="5" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
-                  ) : (
-                    filteredInventory.map((item, index) => (
-                      <tr key={`inv-row-${item.id}-${index}`} className="hover:bg-blue-50/40 transition-colors group">
-                        <td className="px-10 py-6 font-mono font-black text-blue-700 text-xl tracking-tighter">{item.id}</td>
-                        <td className="px-10 py-6 font-bold text-slate-600 uppercase text-xs tracking-tight">{item.tipo}</td>
-                        <td className="px-10 py-6">
-                          <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm border ${
-                            item.estatus === 'CEDIS' ? 'bg-green-100 text-green-700 border-green-200' :
-                            item.estatus === 'En Tienda' ? 'bg-orange-100 text-orange-700 border-orange-200' :
-                            'bg-red-100 text-red-700 border-red-200'
-                          }`}>
-                            {item.estatus}
-                          </span>
-                        </td>
-                        <td className="px-10 py-6 text-slate-500 font-bold text-xs uppercase tracking-tight">{item.ubicacion}</td>
-                        <td className="px-10 py-6 text-right">
-                          <button className="text-slate-300 group-hover:text-blue-600 transition-all p-2 bg-slate-50 rounded-lg"><ChevronRight size={22}/></button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'stores' && (
-          <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
-            <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-5 top-4 text-slate-400" size={20} />
-                <input 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar por ID, Nombre o Zona..." 
-                  className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
-                />
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
-                  <tr>
-                    <th className="px-10 py-6">ID Tienda</th>
-                    <th className="px-10 py-6">Nombre del Destino</th>
-                    <th className="px-10 py-6">Dirección</th>
-                    <th className="px-10 py-6">Zona</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y-2 divide-slate-50 text-sm">
-                  {filteredStores.length === 0 ? (
-                    <tr><td colSpan="4" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
-                  ) : (
-                    filteredStores.map((s, index) => (
-                      <tr key={`store-row-${s.id}-${index}`} className="hover:bg-blue-50/40 transition-colors group">
-                        <td className="px-10 py-6 font-mono font-black text-blue-700 text-lg tracking-tighter">{s.id}</td>
-                        <td className="px-10 py-6 font-bold text-slate-700 uppercase tracking-tight">{s.nombre}</td>
-                        <td className="px-10 py-6 text-slate-500 font-medium">{s.direccion}</td>
-                        <td className="px-10 py-6">
-                          <span className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200">
-                            {s.zona}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'users' && (
-          <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
-            <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-5 top-4 text-slate-400" size={20} />
-                <input 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar por Usuario, Nombre o Rol..." 
-                  className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
-                />
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
-                  <tr>
-                    <th className="px-10 py-6">ID Usuario</th>
-                    <th className="px-10 py-6">Nombre Completo</th>
-                    <th className="px-10 py-6">Credencial (Login)</th>
-                    <th className="px-10 py-6">Nivel de Acceso</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y-2 divide-slate-50 text-sm">
-                  {filteredUsers.length === 0 ? (
-                    <tr><td colSpan="4" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
-                  ) : (
-                    filteredUsers.map((u, index) => (
-                      <tr key={`user-row-${u.id}-${index}`} className="hover:bg-blue-50/40 transition-colors group">
-                        <td className="px-10 py-6 font-mono font-black text-blue-700 text-lg tracking-tighter">{u.id}</td>
-                        <td className="px-10 py-6 font-bold text-slate-700 uppercase tracking-tight">{u.nombre}</td>
-                        <td className="px-10 py-6 text-slate-500 font-mono font-medium">{u.usuario}</td>
-                        <td className="px-10 py-6">
-                          <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
-                            u.rol === 'Superusuario' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'
-                          }`}>
-                            {u.rol}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'incidents' && (
-          <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
-            <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-5 top-4 text-slate-400" size={20} />
-                <input 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar por ID de Activo o Detalles..." 
-                  className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
-                />
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
-                  <tr>
-                    <th className="px-10 py-6">ID Incidencia</th>
-                    <th className="px-10 py-6">Activo Afectado</th>
-                    <th className="px-10 py-6">Tipo</th>
-                    <th className="px-10 py-6">Detalles</th>
-                    <th className="px-10 py-6">Fecha / Reportó</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y-2 divide-slate-50 text-sm">
-                  {filteredIncidents.length === 0 ? (
-                    <tr><td colSpan="5" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
-                  ) : (
-                    filteredIncidents.map((inc, index) => (
-                      <tr key={`inc-row-${inc.id}-${index}`} className="hover:bg-red-50/40 transition-colors group">
-                        <td className="px-10 py-6 font-mono font-black text-red-700 text-sm tracking-tighter">{inc.id}</td>
-                        <td className="px-10 py-6 font-bold font-mono text-slate-700 uppercase tracking-tight">{inc.activoId}</td>
-                        <td className="px-10 py-6">
-                          <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
-                            inc.tipo === 'Daño' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-red-100 text-red-700 border-red-200'
-                          }`}>
-                            {inc.tipo}
-                          </span>
-                        </td>
-                        <td className="px-10 py-6 text-slate-600 font-medium">{inc.descripcion}</td>
-                        <td className="px-10 py-6">
-                          <div className="text-xs font-bold text-slate-700">{inc.fecha}</div>
-                          <div className="text-[10px] text-slate-400 uppercase tracking-widest">{inc.usuario}</div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'moves' && (
-          <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
-            <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-5 top-4 text-slate-400" size={20} />
-                <input 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Buscar por Folio, Usuario o Destino..." 
-                  className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
-                />
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
-                  <tr>
-                    <th className="px-10 py-6">Folio de Operación</th>
-                    <th className="px-10 py-6">Fecha y Hora</th>
-                    <th className="px-10 py-6">Tipo</th>
-                    <th className="px-10 py-6">Destino / Origen</th>
-                    <th className="px-10 py-6">Usuario</th>
-                    <th className="px-10 py-6">Grupo</th>
-                    <th className="px-10 py-6">Entregas</th>
-                    <th className="px-10 py-6">Activos (IDs)</th>
-                    <th className="px-10 py-6">Documento</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y-2 divide-slate-50 text-sm">
-                  {filteredMovements.length === 0 ? (
-                    <tr><td colSpan="9" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
-                  ) : (
-                    filteredMovements.map((mov, index) => (
-                      <tr key={`mov-row-${mov.id || index}`} className="hover:bg-blue-50/40 transition-colors group">
-                        <td className="px-10 py-6 font-mono font-black text-slate-700 tracking-tighter text-sm">{mov.folio}</td>
-                        <td className="px-10 py-6 font-bold text-slate-500 text-xs tracking-tight">{mov.fecha}</td>
-                        <td className="px-10 py-6">
-                          <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
-                            mov.tipo === 'Salida' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-blue-100 text-blue-700 border-blue-200'
-                          }`}>
-                            {mov.tipo}
-                          </span>
-                        </td>
-                        <td className="px-10 py-6 font-bold text-slate-600 uppercase text-xs tracking-tight">{mov.tienda}</td>
-                        <td className="px-10 py-6 text-slate-500 font-bold text-xs uppercase tracking-tight">{mov.usuario}</td>
-                        <td className="px-10 py-6 font-bold text-slate-600">{mov.grupo || '-'}</td>
-                        <td className="px-10 py-6 font-bold text-slate-600">{mov.entregas || '-'}</td>
-                        <td className="px-10 py-6 font-mono font-bold text-blue-600 text-xs truncate max-w-[150px]">{mov.activos}</td>
-                        <td className="px-10 py-6">
-                          {mov.pdf && mov.pdf.startsWith('http') ? (
-                            <a href={mov.pdf} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 font-black text-[10px] uppercase tracking-widest underline">
-                              Ver Vale
-                            </a>
-                          ) : (
-                            <span className="text-slate-300 text-[10px] font-bold">N/A</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* MODALES DE CREACIÓN DE REGISTROS */}
-        {showModal && (
-          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
-            <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl border-4 border-slate-100 scale-in-center">
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">
-                  {showModal === 'item' && 'Registrar Activo'}
-                  {showModal === 'store' && 'Alta de Tienda'}
-                  {showModal === 'user' && 'Nuevo Usuario'}
-                </h2>
-                <button onClick={() => setShowModal(null)} className="p-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 hover:text-slate-800 transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-
-              {showModal === 'item' && (
-                <form className="space-y-5" onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (isSaving) return;
-                  
-                  const newId = e.target.id.value.toUpperCase();
-                  
-                  if (inventory.some(item => item.id === newId)) {
-                    alert(`Error: El activo con ID "${newId}" ya se encuentra registrado en el inventario.`);
-                    return;
-                  }
-
-                  setIsSaving(true);
-                  
-                  const nuevoActivo = { 
-                    id: newId, 
-                    tipo: e.target.tipo.value, 
-                    estatus: 'CEDIS', 
-                    ubicacion: 'Almacén Principal' 
-                  };
-                  
-                  try {
-                    const result = await fetchAPI({
-                      action: 'registrarActivo',
-                      payload: nuevoActivo
-                    });
-                    
-                    if (result && result.status === 'success') {
-                      setInventory([nuevoActivo, ...inventory]);
-                      setShowModal(null);
-                      alert("✅ Activo guardado en Google Sheets");
-                    }
-                  } catch (error) {
-                    alert(`❌ Error al guardar: ${error.message}`);
-                  } finally {
-                    setIsSaving(false);
-                  }
-                }}>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">ID Único (Ej. H-1005 o P-5003)</label>
-                    <input name="id" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-mono uppercase focus:border-blue-500 outline-none transition-colors font-bold text-slate-800" placeholder="H-XXXX" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Clasificación de Activo</label>
-                    <select name="tipo" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800 appearance-none">
-                      <option>Hielera</option>
-                      <option>Placa</option>
-                    </select>
-                  </div>
-                  <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50">
-                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Guardar Activo'}
-                  </button>
-                </form>
-              )}
-
-              {showModal === 'store' && (
-                <form className="space-y-5" onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (isSaving) return;
-                  setIsSaving(true);
-                  
-                  const newStore = { 
-                    id: `T-0${stores.length + 1}`, 
-                    nombre: e.target.nombre.value, 
-                    direccion: e.target.direccion.value, 
-                    zona: e.target.zona.value 
-                  };
-                  
-                  try {
-                    const result = await fetchAPI({
-                      action: 'registrarTienda',
-                      payload: newStore
-                    });
-                    
-                    if (result && result.status === 'success') {
-                      setStores([...stores, newStore]);
-                      setShowModal(null);
-                      alert("✅ Tienda guardada en Google Sheets");
-                    }
-                  } catch (error) {
-                    alert(`❌ Error al guardar: ${error.message}`);
-                  } finally {
-                    setIsSaving(false);
-                  }
-                }}>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Nombre de la Sucursal</label>
-                    <input name="nombre" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800" placeholder="Ej. OXXO Centro" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Dirección Completa</label>
-                    <input name="direccion" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-medium text-slate-800" placeholder="Calle, número, colonia..." />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Zona Operativa</label>
-                    <select name="zona" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800 appearance-none">
-                      <option>Norte</option><option>Sur</option><option>Centro</option><option>Oriente</option><option>Poniente</option>
-                    </select>
-                  </div>
-                  <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50">
-                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Registrar Tienda'}
-                  </button>
-                </form>
-              )}
-
-              {showModal === 'user' && (
-                <form className="space-y-5" onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (isSaving) return;
-                  setIsSaving(true);
-                  
-                  const newUser = { 
-                    id: `U-0${usersList.length + 1}`, 
-                    usuario: e.target.usuario.value,
-                    password: e.target.password.value,
-                    nombre: e.target.nombre.value, 
-                    rol: e.target.rol.value 
-                  };
-                  
-                  try {
-                    const result = await fetchAPI({
-                      action: 'registrarUsuario',
-                      payload: newUser
-                    });
-                    
-                    if (result && result.status === 'success') {
-                      setUsersList([...usersList, newUser]);
-                      setShowModal(null);
-                      alert("✅ Usuario guardado en Google Sheets");
-                    }
-                  } catch (error) {
-                    alert(`❌ Error al guardar: ${error.message}`);
-                  } finally {
-                    setIsSaving(false);
-                  }
-                }}>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Nombre y Apellido</label>
-                    <input name="nombre" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800" placeholder="Ej. Carlos Martínez" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Usuario (Credencial)</label>
-                    <input name="usuario" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-mono focus:border-blue-500 outline-none font-bold text-slate-800" placeholder="cmartinez" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Contraseña de Acceso</label>
-                    <input name="password" type="password" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800" placeholder="••••••••" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Nivel de Privilegios</label>
-                    <select name="rol" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800 appearance-none">
-                      <option>Operador</option>
-                      <option>Superusuario</option>
-                    </select>
-                  </div>
-                  <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50">
-                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Crear Usuario'}
-                  </button>
-                </form>
-              )}
-
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
-  );
-};
-
-// --- COMPONENTES ATÓMICOS ---
-const NavItem = ({ icon, label, active, onClick }) => (
-  <button 
-    onClick={onClick}
-    className={`w-full flex items-center gap-5 px-6 py-5 rounded-2xl font-black transition-all text-sm uppercase tracking-widest ${
-      active ? 'bg-blue-600 text-white shadow-2xl translate-x-3 scale-105' : 'text-slate-500 hover:bg-slate-800/80 hover:text-slate-300'
-    }`}
-  >
-    <div className={`${active ? 'text-white' : 'text-slate-600'}`}>{icon}</div>
-    <span>{label}</span>
-  </button>
-);
-
-const StatCard = ({ label, value, icon, color }) => {
-  const colors = {
-    blue: 'border-l-blue-600 shadow-blue-900/5',
-    green: 'border-l-green-600 shadow-green-900/5',
-    orange: 'border-l-orange-600 shadow-orange-900/5',
-    red: 'border-l-red-600 shadow-red-900/5'
-  };
-  return (
-    <div className={`bg-white p-10 rounded-3xl border-l-[10px] shadow-2xl transition-all hover:-translate-y-2 cursor-default border-t border-r border-b border-slate-100 ${colors[color]}`}>
-      <div className="flex justify-between items-start">
-        <div className="space-y-1">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 leading-none">{label}</p>
-          <p className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{value}</p>
-        </div>
-        <div className="p-5 bg-slate-50 rounded-2xl shadow-inner border border-slate-100">
-          {icon}
+          </form>
         </div>
       </div>
-    </div>
-  );
-};
+    );
 
-export default App;
+    // --- HANDHELD (INTERFAZ RF) ---
+    const MobileHandheld = ({ user, setView, onUpdate, stores, inventory, setInventory, incidents, setIncidents }) => {
+      const [screen, setScreen] = useState('menu'); 
+      const [scannedItems, setScannedItems] = useState([]);
+      const [inputCode, setInputCode] = useState('');
+      const [selectedStore, setSelectedStore] = useState('');
+      const [grupo, setGrupo] = useState(''); 
+      const [entregas, setEntregas] = useState(''); 
+      const [incidentType, setIncidentType] = useState('Dañada');
+      const [incidentDesc, setIncidentDesc] = useState('');
+      const [statusMessage, setStatusMessage] = useState(null);
+      const [isSyncing, setIsSyncing] = useState(false);
+
+      const addScan = (code) => {
+        if (!code) return;
+        const cleanCode = code.trim().toUpperCase();
+        if (scannedItems.includes(cleanCode)) {
+          setStatusMessage({ type: 'error', text: 'DUPLICADO' });
+          return;
+        }
+        setScannedItems([...scannedItems, cleanCode]);
+        setInputCode('');
+        setStatusMessage({ type: 'success', text: `OK: ${cleanCode}` });
+        setTimeout(() => setStatusMessage(null), 800);
+      };
+
+      const resetForm = () => {
+        setScannedItems([]);
+        setIncidentDesc('');
+        setGrupo('');
+        setEntregas('');
+        setScreen('menu');
+      };
+
+      const handleConfirm = async () => {
+        if (scannedItems.length === 0) return;
+        
+        setIsSyncing(true);
+        setStatusMessage({ type: 'info', text: 'ENVIANDO...' });
+
+        if (screen === 'incidencia') {
+          try {
+            const result = await fetchAPI({
+              action: 'registrarIncidencia',
+              payload: {
+                tipo: incidentType === 'Dañada' ? 'Daño' : 'Pérdida',
+                descripcion: incidentDesc || 'Reportado vía RF',
+                usuario: user.name,
+                activos: scannedItems
+              }
+            });
+
+            if (result && result.status === 'success') {
+              setStatusMessage({ type: 'success', text: 'INCIDENCIA REGISTRADA' });
+              setTimeout(() => {
+                resetForm();
+                onUpdate(); 
+              }, 1500);
+            } else {
+              throw new Error(result?.message || "Error en servidor");
+            }
+          } catch (error) {
+             console.warn("Fallo en red de entorno. Usando Fallback local:", error.message);
+             const newIncidents = scannedItems.map((id, index) => ({
+               id: `INC-${Date.now()}-${index}`,
+               activoId: id,
+               tipo: incidentType === 'Dañada' ? 'Daño' : 'Pérdida',
+               descripcion: incidentDesc || 'Reportado vía RF',
+               fecha: new Date().toISOString().split('T')[0],
+               usuario: user.name
+             }));
+             setIncidents([...incidents, ...newIncidents]);
+             
+             const updatedInventory = inventory.map(item => {
+               if (scannedItems.includes(item.id)) {
+                 return { ...item, estatus: incidentType };
+               }
+               return item;
+             });
+             setInventory(updatedInventory);
+
+             setStatusMessage({ type: 'success', text: 'GUARDADO (LOCAL)' });
+             setTimeout(() => {
+               resetForm();
+             }, 1500);
+          } finally {
+            setIsSyncing(false);
+          }
+          return;
+        }
+
+        try {
+          const result = await fetchAPI({
+            action: 'registrarMovimiento',
+            payload: {
+              tipo: screen === 'salida' ? 'Salida' : 'Entrada',
+              tienda: selectedStore || 'CEDIS',
+              usuario: user.name,
+              activos: scannedItems,
+              grupo: screen === 'salida' ? grupo : '', 
+              entregas: screen === 'salida' ? entregas : '' 
+            }
+          });
+
+          if (result && result.status === 'success') {
+            setStatusMessage({ type: 'success', text: 'ÉXITO: GUARDADO' });
+            setTimeout(() => {
+              resetForm();
+              onUpdate();
+            }, 1500);
+          }
+        } catch (error) {
+          setStatusMessage({ type: 'error', text: 'ERROR DE RED' });
+          alert(`❌ Error de conexión: ${error.message}`);
+        } finally {
+          setIsSyncing(false);
+        }
+      };
+
+      return (
+        <div className="max-w-md mx-auto h-screen bg-slate-950 flex flex-col text-white shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+          <div className="p-4 bg-slate-900 border-b-2 border-slate-800 flex justify-between items-center">
+            <div>
+              <p className="text-[10px] text-slate-500 font-black uppercase italic">Handheld Terminal</p>
+              <h2 className="font-black text-xl tracking-tighter text-orange-500">
+                {screen === 'menu' ? 'LOGÍSTICA' : screen === 'salida' ? 'DESPACHO' : 'RETORNO'}
+              </h2>
+            </div>
+            <button onClick={() => setView('login')} className="p-2 bg-slate-800 rounded-lg text-slate-400">
+              <LogOut size={20} />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {statusMessage && (
+              <div className={`p-5 rounded-xl font-black text-center text-2xl shadow-lg animate-bounce ${
+                statusMessage.type === 'error' ? 'bg-red-600' : 
+                statusMessage.type === 'info' ? 'bg-blue-600' : 'bg-green-600'
+              }`}>
+                {statusMessage.text}
+              </div>
+            )}
+
+            {screen === 'menu' && (
+              <div className="flex flex-col gap-4 py-4">
+                <button onClick={() => setScreen('salida')} className="bg-orange-600 p-6 rounded-3xl flex flex-col items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_8px_0_rgb(154,52,18)] border-2 border-orange-400">
+                  <Truck size={40} />
+                  <span className="font-black text-xl tracking-tight">SALIDA TIENDA</span>
+                </button>
+                <button onClick={() => setScreen('entrada')} className="bg-blue-600 p-6 rounded-3xl flex flex-col items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_8px_0_rgb(29,78,216)] border-2 border-blue-400">
+                  <Package size={40} />
+                  <span className="font-black text-xl tracking-tight">ENTRADA CEDIS</span>
+                </button>
+                <button onClick={() => setScreen('incidencia')} className="bg-red-600 p-6 rounded-3xl flex flex-col items-center justify-center gap-3 active:scale-95 transition-all shadow-[0_8px_0_rgb(185,28,28)] border-2 border-red-400">
+                  <AlertOctagon size={40} />
+                  <span className="font-black text-xl tracking-tight">REPORTAR INCIDENCIA</span>
+                </button>
+              </div>
+            )}
+
+            {(screen === 'salida' || screen === 'entrada' || screen === 'incidencia') && (
+              <div className="space-y-4">
+                {screen === 'salida' && (
+                  <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase">Destino de Carga:</label>
+                      <select 
+                        className="w-full bg-slate-800 p-4 rounded-xl border-2 border-slate-700 text-xl font-black outline-none focus:border-orange-500 appearance-none"
+                        onChange={(e) => setSelectedStore(e.target.value)}
+                        value={selectedStore}
+                      >
+                        <option value="">-- ELIGE DESTINO --</option>
+                        {stores.map((s, idx) => <option key={`store-opt-${s.id}-${idx}`} value={s.id}>{s.nombre}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase">Grupo(s):</label>
+                      <input 
+                        type="text" 
+                        value={grupo}
+                        onChange={(e) => setGrupo(e.target.value)}
+                        placeholder="Ej. 1, 2, 3"
+                        className="w-full bg-slate-800 p-4 rounded-xl border-2 border-slate-700 text-lg font-black outline-none focus:border-orange-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase">Entrega(s):</label>
+                      <input 
+                        type="text" 
+                        value={entregas}
+                        onChange={(e) => setEntregas(e.target.value)}
+                        placeholder="Ej. 5, 8, 12"
+                        className="w-full bg-slate-800 p-4 rounded-xl border-2 border-slate-700 text-lg font-black outline-none focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {screen === 'incidencia' && (
+                  <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase">Tipo de Incidencia:</label>
+                      <select 
+                        className="w-full bg-slate-800 p-4 rounded-xl border-2 border-slate-700 text-xl font-black outline-none focus:border-red-500 appearance-none text-red-400"
+                        onChange={(e) => setIncidentType(e.target.value)}
+                        value={incidentType}
+                      >
+                        <option value="Dañada">Activo Dañado / Roto</option>
+                        <option value="Perdida">Activo Perdido / Robado</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 mb-2 uppercase">Detalles (Opcional):</label>
+                      <input 
+                        type="text" 
+                        value={incidentDesc}
+                        onChange={(e) => setIncidentDesc(e.target.value)}
+                        placeholder="Escriba un detalle..."
+                        className="w-full bg-slate-800 border-2 border-slate-700 p-3 rounded-xl text-sm font-bold focus:border-red-500 outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-slate-900 p-5 rounded-2xl border-2 border-slate-800">
+                  <div className="flex justify-between items-center mb-2">
+                    <label className={`block text-[10px] font-black uppercase ${screen === 'incidencia' ? 'text-red-500' : 'text-orange-500'}`}>Esperando Escaneo...</label>
+                    <Scan size={16} className={`${screen === 'incidencia' ? 'text-red-500' : 'text-orange-500'} animate-pulse`} />
+                  </div>
+                  <input 
+                    type="text" 
+                    value={inputCode}
+                    onChange={(e) => setInputCode(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && addScan(inputCode)}
+                    className={`w-full bg-black border-2 border-slate-700 p-5 rounded-xl text-4xl font-mono font-bold ${screen === 'incidencia' ? 'text-red-400 focus:border-red-500' : 'text-green-400 focus:border-green-500'} outline-none uppercase tracking-widest shadow-inner`}
+                    autoFocus
+                    placeholder="..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center px-1">
+                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">Activos: {scannedItems.length}</h3>
+                    <button onClick={() => setScannedItems([])} className="text-[10px] text-red-500 font-black uppercase hover:underline">Limpiar</button>
+                  </div>
+                  <div className="bg-black/50 rounded-2xl max-h-[35vh] overflow-y-auto divide-y divide-slate-800 border border-slate-800 shadow-inner">
+                    {scannedItems.length === 0 ? (
+                      <div className="p-12 text-center">
+                        <ClipboardList className="mx-auto text-slate-800 mb-2" size={48} />
+                        <p className="text-xs text-slate-700 font-bold uppercase italic tracking-widest">Lista Vacía</p>
+                      </div>
+                    ) : (
+                      scannedItems.map((code, idx) => (
+                        <div key={`scan-${code}-${idx}`} className="p-4 flex justify-between items-center animate-in slide-in-from-left duration-200">
+                          <span className="font-mono text-2xl font-black tracking-tighter text-slate-200">{code}</span>
+                          <div className="bg-green-600/20 p-1 rounded-full text-green-500">
+                            <CheckCircle2 size={24} />
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {(screen === 'salida' || screen === 'entrada' || screen === 'incidencia') && (
+            <div className="p-4 bg-slate-900 grid grid-cols-2 gap-4 border-t-2 border-slate-800">
+              <button 
+                onClick={resetForm}
+                disabled={isSyncing}
+                className="p-5 bg-slate-800 font-black rounded-2xl uppercase text-xs tracking-widest active:scale-95 transition-all disabled:opacity-50"
+              >
+                ATRÁS
+              </button>
+              <button 
+                onClick={handleConfirm}
+                disabled={scannedItems.length === 0 || (screen === 'salida' && !selectedStore) || isSyncing}
+                className={`p-5 font-black rounded-2xl uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2 transition-all ${
+                  scannedItems.length > 0 && !isSyncing 
+                    ? screen === 'incidencia' ? 'bg-red-600 text-white active:scale-95 shadow-[0_4px_0_rgb(153,27,27)]' : 'bg-green-600 text-white active:scale-95 shadow-[0_4px_0_rgb(22,101,52)]' 
+                    : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                }`}
+              >
+                {isSyncing ? <Loader2 className="animate-spin" size={18} /> : 'GUARDAR'}
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    // --- WEB DASHBOARD ---
+    const WebDashboard = ({ user, inventory, setInventory, incidents, movements, loading, onRefresh, setView, stores, setStores, usersList, setUsersList }) => {
+      const [activeTab, setActiveTab] = useState('overview');
+      const [showModal, setShowModal] = useState(null); 
+      const [isSaving, setIsSaving] = useState(false);
+      const [searchTerm, setSearchTerm] = useState('');
+
+      const changeTab = (tab) => {
+        setActiveTab(tab);
+        setSearchTerm(''); 
+      };
+
+      // Separación estricta de Placas y Hieleras
+      const stats = useMemo(() => {
+        const getStats = (tipo) => {
+          const filtered = inventory.filter(i => i.tipo === tipo);
+          return {
+            total: filtered.length,
+            enCedis: filtered.filter(i => i.estatus === 'CEDIS').length,
+            enTienda: filtered.filter(i => i.estatus === 'En Tienda').length,
+            dañadas: filtered.filter(i => i.estatus === 'Dañada' || i.estatus === 'Perdida').length
+          };
+        };
+        return {
+          hieleras: getStats('Hielera'),
+          placas: getStats('Placa')
+        };
+      }, [inventory]);
+
+      const zonesStock = useMemo(() => {
+        const uniqueZones = [...new Set(stores.map(s => s.zona).filter(Boolean))];
+        
+        return uniqueZones.map(zona => {
+          const storesInZone = stores.filter(s => s.zona === zona);
+          const storeNames = storesInZone.map(s => s.nombre);
+          const storeIds = storesInZone.map(s => s.id);
+          
+          const stock = inventory.filter(item => 
+            (storeNames.includes(item.ubicacion) || storeIds.includes(item.ubicacion)) && 
+            item.estatus === 'En Tienda'
+          ).length;
+          
+          return { zona, stock };
+        }).sort((a, b) => b.stock - a.stock);
+      }, [stores, inventory]);
+
+      const chartData = useMemo(() => {
+        const activityMap = {};
+        
+        movements.forEach(m => {
+          if (!m.fecha) return;
+          const date = String(m.fecha).split(' ')[0]; 
+          const numAssets = m.activos ? String(m.activos).split(',').length : 0;
+          activityMap[date] = (activityMap[date] || 0) + numAssets;
+        });
+
+        const sortedDates = Object.keys(activityMap).sort();
+        let endDate = new Date();
+        
+        if (sortedDates.length > 0) {
+          const lastDateStr = sortedDates[sortedDates.length - 1];
+          const parts = lastDateStr.split('-');
+          if (parts.length === 3) {
+            endDate = new Date(parts[0], parts[1] - 1, parts[2]);
+          }
+        }
+
+        const dataItems = [];
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(endDate);
+          d.setDate(d.getDate() - i);
+          
+          const year = d.getFullYear();
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          
+          const dateKey = `${year}-${month}-${day}`;
+          const label = `${day}/${month}`;
+          
+          dataItems.push({
+            label: label,
+            value: activityMap[dateKey] || 0
+          });
+        }
+
+        const maxValue = Math.max(...dataItems.map(d => d.value), 10); 
+        
+        return dataItems.map(d => ({
+          ...d,
+          height: Math.max((d.value / maxValue) * 100, d.value > 0 ? 5 : 0) 
+        }));
+      }, [movements]);
+
+      // --- LÓGICA DE FILTRADO PARA TABLAS ---
+      const lowerSearch = searchTerm.toLowerCase();
+      
+      const filteredInventory = inventory.filter(i => 
+        (i.id && String(i.id).toLowerCase().includes(lowerSearch)) || 
+        (i.tipo && String(i.tipo).toLowerCase().includes(lowerSearch)) || 
+        (i.ubicacion && String(i.ubicacion).toLowerCase().includes(lowerSearch))
+      );
+
+      const filteredStores = stores.filter(s => 
+        (s.id && String(s.id).toLowerCase().includes(lowerSearch)) || 
+        (s.nombre && String(s.nombre).toLowerCase().includes(lowerSearch)) || 
+        (s.zona && String(s.zona).toLowerCase().includes(lowerSearch)) || 
+        (s.direccion && String(s.direccion).toLowerCase().includes(lowerSearch))
+      );
+
+      const filteredUsers = usersList.filter(u => 
+        (u.id && String(u.id).toLowerCase().includes(lowerSearch)) || 
+        (u.nombre && String(u.nombre).toLowerCase().includes(lowerSearch)) || 
+        (u.usuario && String(u.usuario).toLowerCase().includes(lowerSearch)) || 
+        (u.rol && String(u.rol).toLowerCase().includes(lowerSearch))
+      );
+
+      const filteredIncidents = incidents.filter(inc => 
+        (inc.id && String(inc.id).toLowerCase().includes(lowerSearch)) || 
+        (inc.activoId && String(inc.activoId).toLowerCase().includes(lowerSearch)) || 
+        (inc.descripcion && String(inc.descripcion).toLowerCase().includes(lowerSearch)) || 
+        (inc.tipo && String(inc.tipo).toLowerCase().includes(lowerSearch))
+      );
+
+      const filteredMovements = movements.filter(m => 
+        (m.folio && String(m.folio).toLowerCase().includes(lowerSearch)) || 
+        (m.usuario && String(m.usuario).toLowerCase().includes(lowerSearch)) || 
+        (m.tienda && String(m.tienda).toLowerCase().includes(lowerSearch)) || 
+        (m.activos && String(m.activos).toLowerCase().includes(lowerSearch)) || 
+        (m.tipo && String(m.tipo).toLowerCase().includes(lowerSearch)) ||
+        (m.grupo && String(m.grupo).toLowerCase().includes(lowerSearch)) || 
+        (m.entregas && String(m.entregas).toLowerCase().includes(lowerSearch)) 
+      );
+
+      const handleDownloadExcel = () => {
+        let dataToExport = [];
+        let headers = [];
+        let filename = `reporte_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`;
+
+        switch (activeTab) {
+          case 'inventory':
+            headers = ['ID Activo', 'Clasificación', 'Estatus Operativo', 'Ubicación Última'];
+            dataToExport = filteredInventory.map(item => [item.id, item.tipo, item.estatus, item.ubicacion]);
+            break;
+          case 'stores':
+            headers = ['ID Tienda', 'Nombre', 'Dirección', 'Zona'];
+            dataToExport = filteredStores.map(s => [s.id, s.nombre, s.direccion, s.zona]);
+            break;
+          case 'users':
+            headers = ['ID Usuario', 'Nombre Completo', 'Credencial', 'Nivel'];
+            dataToExport = filteredUsers.map(u => [u.id, u.nombre, u.usuario, u.rol]);
+            break;
+          case 'incidents':
+            headers = ['ID Incidencia', 'Activo', 'Tipo', 'Detalles', 'Fecha', 'Usuario'];
+            dataToExport = filteredIncidents.map(inc => [inc.id, inc.activoId, inc.tipo, inc.descripcion, inc.fecha, inc.usuario]);
+            break;
+          case 'moves':
+            headers = ['Folio de Operación', 'Fecha y Hora', 'Tipo', 'Destino / Origen', 'Usuario', 'Grupo', 'Entregas', 'Activos Movidos', 'PDF'];
+            dataToExport = filteredMovements.map(m => [m.folio, m.fecha, m.tipo, m.tienda, m.usuario, m.grupo || '', m.entregas || '', m.activos, m.pdf || '']);
+            break;
+          default:
+            alert('Navega a Inventario, Tiendas, Usuarios, Incidencias o Histórico para descargar su tabla correspondiente.');
+            return;
+        }
+
+        const csvContent = [
+          headers.join(','),
+          ...dataToExport.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        ].join('\n');
+
+        const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+      return (
+        <div className="flex h-screen bg-slate-50 overflow-hidden w-full">
+          <aside className="w-72 bg-slate-900 text-white flex flex-col shadow-2xl z-20">
+            <div className="p-8 border-b border-slate-800">
+              <div className="flex items-center gap-4">
+                <div className="bg-blue-600 p-3 rounded-2xl shadow-[0_4px_20px_rgba(37,99,235,0.4)]">
+                  <Truck size={28} />
+                </div>
+                <div>
+                  <span className="font-black text-2xl tracking-tighter uppercase block leading-none">Hieleras</span>
+                  <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Admin Panel v2</span>
+                </div>
+              </div>
+            </div>
+            
+            <nav className="flex-1 p-6 space-y-3 overflow-y-auto">
+              <NavItem icon={<LayoutDashboard size={22}/>} label="General" active={activeTab === 'overview'} onClick={() => changeTab('overview')} />
+              <NavItem icon={<Package size={22}/>} label="Inventario" active={activeTab === 'inventory'} onClick={() => changeTab('inventory')} />
+              <NavItem icon={<Store size={22}/>} label="Tiendas" active={activeTab === 'stores'} onClick={() => changeTab('stores')} />
+              <NavItem icon={<Users size={22}/>} label="Usuarios" active={activeTab === 'users'} onClick={() => changeTab('users')} />
+              <NavItem icon={<AlertOctagon size={22}/>} label="Incidencias" active={activeTab === 'incidents'} onClick={() => changeTab('incidents')} />
+              <NavItem icon={<ArrowRightLeft size={22}/>} label="Histórico" active={activeTab === 'moves'} onClick={() => changeTab('moves')} />
+            </nav>
+
+            <div className="p-6 border-t border-slate-800 space-y-4">
+              <button 
+                onClick={onRefresh} 
+                disabled={loading} 
+                className="w-full flex items-center justify-center gap-3 p-4 bg-blue-600/10 text-blue-400 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-600/20 transition-all border border-blue-600/30 disabled:opacity-50"
+              >
+                {loading ? <Loader2 size={16} className="animate-spin" /> : <ArrowRightLeft size={16} />} 
+                Sync Google Sheets
+              </button>
+              
+              <div className="flex items-center justify-between gap-2 p-4 bg-slate-800/40 rounded-2xl border border-slate-800">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-black text-sm shadow-lg">AD</div>
+                  <div className="overflow-hidden">
+                    <p className="font-black text-slate-200 text-sm truncate uppercase tracking-tight">{user.name}</p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Superusuario</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setView('login')} 
+                  className="p-3 bg-slate-700/50 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-xl transition-all"
+                  title="Cerrar Sesión"
+                >
+                  <LogOut size={18} />
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          <main className="flex-1 p-10 overflow-y-auto">
+            <header className="flex justify-between items-end mb-12">
+              <div>
+                <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-2">
+                  {activeTab === 'overview' && 'Resumen de Flota'}
+                  {activeTab === 'inventory' && 'Inventario Activo'}
+                  {activeTab === 'stores' && 'Catálogo de Tiendas'}
+                  {activeTab === 'users' && 'Gestión de Usuarios'}
+                  {activeTab === 'incidents' && 'Registro de Incidencias'}
+                  {activeTab === 'moves' && 'Bitácora Logística'}
+                </h1>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                  <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Sincronización Activa con Sheets</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <button onClick={handleDownloadExcel} className="bg-white border-2 border-slate-200 text-slate-700 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
+                  <Download size={16} /> Descargar CSV
+                </button>
+                {activeTab === 'inventory' && (
+                  <button onClick={() => setShowModal('item')} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl flex items-center gap-2">
+                    <Plus size={16} /> Nuevo Activo
+                  </button>
+                )}
+                {activeTab === 'stores' && (
+                  <button onClick={() => setShowModal('store')} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl flex items-center gap-2">
+                    <Plus size={16} /> Nueva Tienda
+                  </button>
+                )}
+                {activeTab === 'users' && (
+                  <button onClick={() => setShowModal('user')} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl flex items-center gap-2">
+                    <Plus size={16} /> Nuevo Usuario
+                  </button>
+                )}
+              </div>
+            </header>
+
+            {activeTab === 'overview' && (
+              <div className="space-y-10">
+                <div className="space-y-4">
+                  <h3 className="font-black text-slate-500 uppercase tracking-widest text-xs flex items-center gap-2">
+                    <Package size={16} className="text-blue-500" /> Resumen de Hieleras
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <StatCard label="Total Hieleras" value={stats.hieleras.total} icon={<Package className="text-blue-600"/>} color="blue" />
+                    <StatCard label="Stock CEDIS" value={stats.hieleras.enCedis} icon={<CheckCircle2 className="text-green-600"/>} color="green" />
+                    <StatCard label="En Tiendas" value={stats.hieleras.enTienda} icon={<Truck className="text-orange-600"/>} color="orange" />
+                    <StatCard label="Fuera de Servicio" value={stats.hieleras.dañadas} icon={<AlertTriangle className="text-red-600"/>} color="red" />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-black text-slate-500 uppercase tracking-widest text-xs flex items-center gap-2">
+                    <Package size={16} className="text-indigo-500" /> Resumen de Placas
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <StatCard label="Total Placas" value={stats.placas.total} icon={<Package className="text-indigo-600"/>} color="blue" />
+                    <StatCard label="Stock CEDIS" value={stats.placas.enCedis} icon={<CheckCircle2 className="text-green-600"/>} color="green" />
+                    <StatCard label="En Tiendas" value={stats.placas.enTienda} icon={<Truck className="text-orange-600"/>} color="orange" />
+                    <StatCard label="Fuera de Servicio" value={stats.placas.dañadas} icon={<AlertTriangle className="text-red-600"/>} color="red" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                  <div className="lg:col-span-2 bg-white p-10 rounded-3xl border-2 border-slate-100 shadow-sm">
+                    <h3 className="font-black text-slate-800 uppercase tracking-tight text-xl italic mb-10">Volumen de Movimientos por Fecha</h3>
+                    <div className="h-72 flex items-end justify-between gap-6 px-4">
+                      {chartData.map((item, i) => (
+                        <div key={`chart-col-${i}`} className="flex-1 flex flex-col items-center gap-3 group relative">
+                          <div className="w-full bg-slate-50 rounded-2xl relative flex flex-col justify-end h-full overflow-hidden border border-slate-100">
+                            <div className="bg-gradient-to-t from-blue-700 to-blue-500 rounded-2xl w-full transition-all duration-1000 group-hover:brightness-110" style={{ height: `${item.height}%` }}></div>
+                            
+                            {item.value > 0 && (
+                              <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] py-1 px-2 rounded-lg font-black opacity-0 group-hover:opacity-100 transition-all shadow-xl z-10 pointer-events-none">
+                                {item.value} ud.
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">{item.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white p-10 rounded-3xl border-2 border-slate-100 shadow-sm">
+                    <h3 className="font-black text-slate-800 uppercase tracking-tight text-xl italic mb-8">Stock por Zona</h3>
+                    <div className="space-y-8 overflow-y-auto max-h-64 pr-2">
+                      {zonesStock.length === 0 ? (
+                        <p className="text-slate-400 text-sm font-bold">No hay zonas registradas</p>
+                      ) : zonesStock.map((z, i) => {
+                        const maxStock = Math.max(...zonesStock.map(st => st.stock), 1);
+                        const width = Math.max((z.stock / maxStock) * 100, 5);
+                        return (
+                          <div key={`zone-stock-${z.zona}-${i}`} className="space-y-3">
+                            <div className="flex justify-between text-[11px] font-black uppercase tracking-tighter">
+                              <span className="text-slate-600 truncate pr-2">Zona {z.zona}</span>
+                              <span className="text-blue-600 shrink-0">{z.stock} UNI</span>
+                            </div>
+                            <div className="h-3 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                              <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-500 rounded-full" style={{ width: `${width}%` }}></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'inventory' && (
+              <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
+                <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-5 top-4 text-slate-400" size={20} />
+                    <input 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Buscar por ID, Tipo o Ubicación..." 
+                      className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
+                      <tr>
+                        <th className="px-10 py-6">ID Activo</th>
+                        <th className="px-10 py-6">Clasificación</th>
+                        <th className="px-10 py-6">Estatus Operativo</th>
+                        <th className="px-10 py-6">Ubicación Última</th>
+                        <th className="px-10 py-6 text-right">Detalles</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-slate-50 text-sm">
+                      {filteredInventory.length === 0 ? (
+                        <tr><td colSpan="5" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
+                      ) : (
+                        filteredInventory.map((item, index) => (
+                          <tr key={`inv-row-${item.id}-${index}`} className="hover:bg-blue-50/40 transition-colors group">
+                            <td className="px-10 py-6 font-mono font-black text-blue-700 text-xl tracking-tighter">{item.id}</td>
+                            <td className="px-10 py-6 font-bold text-slate-600 uppercase text-xs tracking-tight">{item.tipo}</td>
+                            <td className="px-10 py-6">
+                              <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm border ${
+                                item.estatus === 'CEDIS' ? 'bg-green-100 text-green-700 border-green-200' :
+                                item.estatus === 'En Tienda' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                                'bg-red-100 text-red-700 border-red-200'
+                              }`}>
+                                {item.estatus}
+                              </span>
+                            </td>
+                            <td className="px-10 py-6 text-slate-500 font-bold text-xs uppercase tracking-tight">{item.ubicacion}</td>
+                            <td className="px-10 py-6 text-right">
+                              <button className="text-slate-300 group-hover:text-blue-600 transition-all p-2 bg-slate-50 rounded-lg"><ChevronRight size={22}/></button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'stores' && (
+              <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
+                <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-5 top-4 text-slate-400" size={20} />
+                    <input 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Buscar por ID, Nombre o Zona..." 
+                      className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
+                      <tr>
+                        <th className="px-10 py-6">ID Tienda</th>
+                        <th className="px-10 py-6">Nombre del Destino</th>
+                        <th className="px-10 py-6">Dirección</th>
+                        <th className="px-10 py-6">Zona</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-slate-50 text-sm">
+                      {filteredStores.length === 0 ? (
+                        <tr><td colSpan="4" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
+                      ) : (
+                        filteredStores.map((s, index) => (
+                          <tr key={`store-row-${s.id}-${index}`} className="hover:bg-blue-50/40 transition-colors group">
+                            <td className="px-10 py-6 font-mono font-black text-blue-700 text-lg tracking-tighter">{s.id}</td>
+                            <td className="px-10 py-6 font-bold text-slate-700 uppercase tracking-tight">{s.nombre}</td>
+                            <td className="px-10 py-6 text-slate-500 font-medium">{s.direccion}</td>
+                            <td className="px-10 py-6">
+                              <span className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200">
+                                {s.zona}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'users' && (
+              <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
+                <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-5 top-4 text-slate-400" size={20} />
+                    <input 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Buscar por Usuario, Nombre o Rol..." 
+                      className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
+                      <tr>
+                        <th className="px-10 py-6">ID Usuario</th>
+                        <th className="px-10 py-6">Nombre Completo</th>
+                        <th className="px-10 py-6">Credencial (Login)</th>
+                        <th className="px-10 py-6">Nivel de Acceso</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-slate-50 text-sm">
+                      {filteredUsers.length === 0 ? (
+                        <tr><td colSpan="4" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
+                      ) : (
+                        filteredUsers.map((u, index) => (
+                          <tr key={`user-row-${u.id}-${index}`} className="hover:bg-blue-50/40 transition-colors group">
+                            <td className="px-10 py-6 font-mono font-black text-blue-700 text-lg tracking-tighter">{u.id}</td>
+                            <td className="px-10 py-6 font-bold text-slate-700 uppercase tracking-tight">{u.nombre}</td>
+                            <td className="px-10 py-6 text-slate-500 font-mono font-medium">{u.usuario}</td>
+                            <td className="px-10 py-6">
+                              <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
+                                u.rol === 'Superusuario' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}>
+                                {u.rol}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'incidents' && (
+              <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
+                <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-5 top-4 text-slate-400" size={20} />
+                    <input 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Buscar por ID de Activo o Detalles..." 
+                      className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
+                      <tr>
+                        <th className="px-10 py-6">ID Incidencia</th>
+                        <th className="px-10 py-6">Activo Afectado</th>
+                        <th className="px-10 py-6">Tipo</th>
+                        <th className="px-10 py-6">Detalles</th>
+                        <th className="px-10 py-6">Fecha / Reportó</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-slate-50 text-sm">
+                      {filteredIncidents.length === 0 ? (
+                        <tr><td colSpan="5" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
+                      ) : (
+                        filteredIncidents.map((inc, index) => (
+                          <tr key={`inc-row-${inc.id}-${index}`} className="hover:bg-red-50/40 transition-colors group">
+                            <td className="px-10 py-6 font-mono font-black text-red-700 text-sm tracking-tighter">{inc.id}</td>
+                            <td className="px-10 py-6 font-bold font-mono text-slate-700 uppercase tracking-tight">{inc.activoId}</td>
+                            <td className="px-10 py-6">
+                              <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
+                                inc.tipo === 'Daño' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-red-100 text-red-700 border-red-200'
+                              }`}>
+                                {inc.tipo}
+                              </span>
+                            </td>
+                            <td className="px-10 py-6 text-slate-600 font-medium">{inc.descripcion}</td>
+                            <td className="px-10 py-6">
+                              <div className="text-xs font-bold text-slate-700">{inc.fecha}</div>
+                              <div className="text-[10px] text-slate-400 uppercase tracking-widest">{inc.usuario}</div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'moves' && (
+              <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
+                <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-5 top-4 text-slate-400" size={20} />
+                    <input 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Buscar por Folio, Usuario o Destino..." 
+                      className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
+                      <tr>
+                        <th className="px-10 py-6">Folio de Operación</th>
+                        <th className="px-10 py-6">Fecha y Hora</th>
+                        <th className="px-10 py-6">Tipo</th>
+                        <th className="px-10 py-6">Destino / Origen</th>
+                        <th className="px-10 py-6">Usuario</th>
+                        <th className="px-10 py-6">Grupo</th>
+                        <th className="px-10 py-6">Entregas</th>
+                        <th className="px-10 py-6">Activos (IDs)</th>
+                        <th className="px-10 py-6">Documento</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-slate-50 text-sm">
+                      {filteredMovements.length === 0 ? (
+                        <tr><td colSpan="9" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
+                      ) : (
+                        filteredMovements.map((mov, index) => (
+                          <tr key={`mov-row-${mov.id || index}`} className="hover:bg-blue-50/40 transition-colors group">
+                            <td className="px-10 py-6 font-mono font-black text-slate-700 tracking-tighter text-sm">{mov.folio}</td>
+                            <td className="px-10 py-6 font-bold text-slate-500 text-xs tracking-tight">{mov.fecha}</td>
+                            <td className="px-10 py-6">
+                              <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
+                                mov.tipo === 'Salida' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-blue-100 text-blue-700 border-blue-200'
+                              }`}>
+                                {mov.tipo}
+                              </span>
+                            </td>
+                            <td className="px-10 py-6 font-bold text-slate-600 uppercase text-xs tracking-tight">{mov.tienda}</td>
+                            <td className="px-10 py-6 text-slate-500 font-bold text-xs uppercase tracking-tight">{mov.usuario}</td>
+                            <td className="px-10 py-6 font-bold text-slate-600">{mov.grupo || '-'}</td>
+                            <td className="px-10 py-6 font-bold text-slate-600">{mov.entregas || '-'}</td>
+                            <td className="px-10 py-6 font-mono font-bold text-blue-600 text-xs truncate max-w-[150px]">{mov.activos}</td>
+                            <td className="px-10 py-6">
+                              {mov.pdf && mov.pdf.startsWith('http') ? (
+                                <a href={mov.pdf} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 font-black text-[10px] uppercase tracking-widest underline">
+                                  Ver Vale
+                                </a>
+                              ) : (
+                                <span className="text-slate-300 text-[10px] font-bold">N/A</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* MODALES DE CREACIÓN DE REGISTROS */}
+            {showModal && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
+                <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl border-4 border-slate-100 scale-in-center">
+                  <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">
+                      {showModal === 'item' && 'Registrar Activo'}
+                      {showModal === 'store' && 'Alta de Tienda'}
+                      {showModal === 'user' && 'Nuevo Usuario'}
+                    </h2>
+                    <button onClick={() => setShowModal(null)} className="p-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 hover:text-slate-800 transition-colors">
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  {showModal === 'item' && (
+                    <form className="space-y-5" onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (isSaving) return;
+                      
+                      const newId = e.target.id.value.toUpperCase();
+                      
+                      if (inventory.some(item => item.id === newId)) {
+                        alert(`Error: El activo con ID "${newId}" ya se encuentra registrado en el inventario.`);
+                        return;
+                      }
+
+                      setIsSaving(true);
+                      
+                      const nuevoActivo = { 
+                        id: newId, 
+                        tipo: e.target.tipo.value, 
+                        estatus: 'CEDIS', 
+                        ubicacion: 'Almacén Principal' 
+                      };
+                      
+                      try {
+                        const result = await fetchAPI({
+                          action: 'registrarActivo',
+                          payload: nuevoActivo
+                        });
+                        
+                        if (result && result.status === 'success') {
+                          setInventory([nuevoActivo, ...inventory]);
+                          setShowModal(null);
+                          alert("✅ Activo guardado en Google Sheets");
+                        }
+                      } catch (error) {
+                        alert(`❌ Error al guardar: ${error.message}`);
+                      } finally {
+                        setIsSaving(false);
+                      }
+                    }}>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">ID Único (Ej. H-1005 o P-5003)</label>
+                        <input name="id" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-mono uppercase focus:border-blue-500 outline-none transition-colors font-bold text-slate-800" placeholder="H-XXXX" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Clasificación de Activo</label>
+                        <select name="tipo" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800 appearance-none">
+                          <option>Hielera</option>
+                          <option>Placa</option>
+                        </select>
+                      </div>
+                      <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50">
+                        {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Guardar Activo'}
+                      </button>
+                    </form>
+                  )}
+
+                  {showModal === 'store' && (
+                    <form className="space-y-5" onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (isSaving) return;
+                      setIsSaving(true);
+                      
+                      const newStore = { 
+                        id: `T-0${stores.length + 1}`, 
+                        nombre: e.target.nombre.value, 
+                        direccion: e.target.direccion.value, 
+                        zona: e.target.zona.value 
+                      };
+                      
+                      try {
+                        const result = await fetchAPI({
+                          action: 'registrarTienda',
+                          payload: newStore
+                        });
+                        
+                        if (result && result.status === 'success') {
+                          setStores([...stores, newStore]);
+                          setShowModal(null);
+                          alert("✅ Tienda guardada en Google Sheets");
+                        }
+                      } catch (error) {
+                        alert(`❌ Error al guardar: ${error.message}`);
+                      } finally {
+                        setIsSaving(false);
+                      }
+                    }}>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Nombre de la Sucursal</label>
+                        <input name="nombre" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800" placeholder="Ej. OXXO Centro" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Dirección Completa</label>
+                        <input name="direccion" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-medium text-slate-800" placeholder="Calle, número, colonia..." />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Zona Operativa</label>
+                        <select name="zona" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800 appearance-none">
+                          <option>Norte</option><option>Sur</option><option>Centro</option><option>Oriente</option><option>Poniente</option>
+                        </select>
+                      </div>
+                      <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50">
+                        {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Registrar Tienda'}
+                      </button>
+                    </form>
+                  )}
+
+                  {showModal === 'user' && (
+                    <form className="space-y-5" onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (isSaving) return;
+                      setIsSaving(true);
+                      
+                      const newUser = { 
+                        id: `U-0${usersList.length + 1}`, 
+                        usuario: e.target.usuario.value,
+                        password: e.target.password.value,
+                        nombre: e.target.nombre.value, 
+                        rol: e.target.rol.value 
+                      };
+                      
+                      try {
+                        const result = await fetchAPI({
+                          action: 'registrarUsuario',
+                          payload: newUser
+                        });
+                        
+                        if (result && result.status === 'success') {
+                          setUsersList([...usersList, newUser]);
+                          setShowModal(null);
+                          alert("✅ Usuario guardado en Google Sheets");
+                        }
+                      } catch (error) {
+                        alert(`❌ Error al guardar: ${error.message}`);
+                      } finally {
+                        setIsSaving(false);
+                      }
+                    }}>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Nombre y Apellido</label>
+                        <input name="nombre" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800" placeholder="Ej. Carlos Martínez" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Usuario (Credencial)</label>
+                        <input name="usuario" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-mono focus:border-blue-500 outline-none font-bold text-slate-800" placeholder="cmartinez" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Contraseña de Acceso</label>
+                        <input name="password" type="password" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800" placeholder="••••••••" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Nivel de Privilegios</label>
+                        <select name="rol" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800 appearance-none">
+                          <option>Operador</option>
+                          <option>Superusuario</option>
+                        </select>
+                      </div>
+                      <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50">
+                        {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Crear Usuario'}
+                      </button>
+                    </form>
+                  )}
+
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
+      );
+    };
+
+    // --- COMPONENTES ATÓMICOS ---
+    const NavItem = ({ icon, label, active, onClick }) => (
+      <button 
+        onClick={onClick}
+        className={`w-full flex items-center gap-5 px-6 py-5 rounded-2xl font-black transition-all text-sm uppercase tracking-widest ${
+          active ? 'bg-blue-600 text-white shadow-2xl translate-x-3 scale-105' : 'text-slate-500 hover:bg-slate-800/80 hover:text-slate-300'
+        }`}
+      >
+        <div className={`${active ? 'text-white' : 'text-slate-600'}`}>{icon}</div>
+        <span>{label}</span>
+      </button>
+    );
+
+    const StatCard = ({ label, value, icon, color }) => {
+      const colors = {
+        blue: 'border-l-blue-600 shadow-blue-900/5',
+        green: 'border-l-green-600 shadow-green-900/5',
+        orange: 'border-l-orange-600 shadow-orange-900/5',
+        red: 'border-l-red-600 shadow-red-900/5'
+      };
+      return (
+        <div className={`bg-white p-10 rounded-3xl border-l-[10px] shadow-2xl transition-all hover:-translate-y-2 cursor-default border-t border-r border-b border-slate-100 ${colors[color]}`}>
+          <div className="flex justify-between items-start">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 leading-none">{label}</p>
+              <p className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{value}</p>
+            </div>
+            <div className="p-5 bg-slate-50 rounded-2xl shadow-inner border border-slate-100">
+              {icon}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    // Renderizar la app en el div de #root
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
