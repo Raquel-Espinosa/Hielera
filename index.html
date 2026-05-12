@@ -8,10 +8,10 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- FontAwesome (Para iconos ultrarrápidos y sin errores de React) -->
+  <!-- FontAwesome (Iconos rápidos y sin errores de React) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- React & ReactDOM (Usando CDNJS por mayor estabilidad) -->
+  <!-- React & ReactDOM -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
 
@@ -23,27 +23,26 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .loader-pulse { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
   </style>
 </head>
 <body class="bg-slate-900">
   
-  <!-- Contenedor principal -->
   <div id="root"></div>
 
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
     // --- CONFIGURACIÓN DE API ---
-    const API_URL = "https://script.google.com/macros/s/AKfycbzcUOt003D02aKsQF8K_693RTBN3HdX_45Pn9Dg3MloxKrIElfwi-2xEtG9vPkuokVywQ/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbyMOIUKh7WQgD6c74fOyeUcUnhN8D5ZUWiyErOb1ouaz4fyk2dZ7wF6tBzBJ57We3xy/exec";
 
     // --- CONECTOR MAESTRO GOOGLE SHEETS ---
     const fetchAPI = async (payloadObj) => {
       const response = await fetch(API_URL, {
         method: 'POST',
         redirect: 'follow', 
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8', 
-        },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify(payloadObj)
       });
       if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
@@ -53,52 +52,18 @@
         if (json.status === 'error') throw new Error(json.message);
         return json;
       } catch (e) {
-        throw new Error(`Respuesta inválida del backend. Actualiza Apps Script.`);
+        throw new Error(`Respuesta inválida del backend.`);
       }
     };
 
-    // --- MOCK DATA DE RESPALDO ---
-    const getLocalYYYYMMDD = (date) => {
-      const y = date.getFullYear();
-      const m = String(date.getMonth() + 1).padStart(2, '0');
-      const d = String(date.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
-    };
-
-    const todayDate = new Date();
-    const todayStr = getLocalYYYYMMDD(todayDate);
-    const yesterdayDate = new Date(); yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayStr = getLocalYYYYMMDD(yesterdayDate);
-    const twoDaysAgoDate = new Date(); twoDaysAgoDate.setDate(twoDaysAgoDate.getDate() - 2);
-    const twoDaysAgoStr = getLocalYYYYMMDD(twoDaysAgoDate);
-
-    const INITIAL_INVENTORY = [
-      { id: 'H-1001', tipo: 'Hielera', estatus: 'CEDIS', ubicacion: 'Almacén A' },
-      { id: 'H-1002', tipo: 'Hielera', estatus: 'En Tienda', ubicacion: 'Tienda OXXO Sur' },
-      { id: 'P-5001', tipo: 'Placa', estatus: 'Dañada', ubicacion: 'Taller' },
-    ];
-
-    const INITIAL_INCIDENTS = [
-      { id: 'INC-001', activoId: 'P-5001', tipo: 'Daño', descripcion: 'Fuga de líquido refrigerante', fecha: todayStr, usuario: 'operador1' }
-    ];
-
-    const STORES = [
-      { id: 'T-01', nombre: 'Tienda OXXO Sur', direccion: 'Av. Siempre Viva 123', zona: 'Sur' },
-      { id: 'T-02', nombre: 'Super Gral. Norte', direccion: 'Calle Falsa 456', zona: 'Norte' },
-      { id: 'T-03', nombre: 'Tienda Express Centro', direccion: 'Reforma 789', zona: 'Centro' },
-    ];
-
+    // --- MOCK DATA DE RESPALDO (Por si la red falla al inicio) ---
+    const INITIAL_INVENTORY = [];
+    const INITIAL_INCIDENTS = [];
+    const STORES = [];
     const INITIAL_USERS = [
-      { id: 'U-01', usuario: 'admin', nombre: 'Administrador Principal', rol: 'Superusuario' },
-      { id: 'U-02', usuario: 'operador1', nombre: 'Juan Pérez', rol: 'Operador' },
-      { id: 'U-03', usuario: 'operador2', nombre: 'María García', rol: 'Operador' }
+      { id: 'U-01', usuario: 'admin', password: 'admin', nombre: 'Administrador Local', rol: 'Superusuario' }
     ];
-
-    const INITIAL_MOVEMENTS = [
-      { id: 'MOV-1', folio: 'S-1698420000000', fecha: `${twoDaysAgoStr} 08:30`, tipo: 'Salida', tienda: 'T-01', usuario: 'admin', activos: 'H-1002', grupo: '1', entregas: '3', pdf: '' },
-      { id: 'MOV-2', folio: 'E-1698430000000', fecha: `${yesterdayStr} 12:45`, tipo: 'Entrada', tienda: 'CEDIS', usuario: 'operador1', activos: 'P-5001, H-1005', grupo: '', entregas: '', pdf: '' },
-      { id: 'MOV-3', folio: 'S-1698440000000', fecha: `${todayStr} 09:15`, tipo: 'Salida', tienda: 'T-02', usuario: 'operador2', activos: 'H-2001, H-2002, P-3001', grupo: '2', entregas: '5', pdf: '' }
-    ];
+    const INITIAL_MOVEMENTS = [];
 
     // --- COMPONENTE PRINCIPAL ---
     const App = () => {
@@ -109,30 +74,45 @@
       const [stores, setStores] = useState(STORES);
       const [usersList, setUsersList] = useState(INITIAL_USERS);
       const [movements, setMovements] = useState(INITIAL_MOVEMENTS);
-      const [loading, setLoading] = useState(false);
+      const [isAppLoading, setIsAppLoading] = useState(true); // Controla la carga antes del login
+      const [loading, setLoading] = useState(false); // Controla la carga en el dashboard
 
+      // --- CARGA INICIAL ANTES DE MOSTRAR EL LOGIN ---
       useEffect(() => {
-        if (user) {
-          refreshData();
-        }
-      }, [user]);
+        const initialLoad = async () => {
+          try {
+            const result = await fetchAPI({ action: 'getDashboard' });
+            if (result && result.status === 'success') {
+              if (result.users) setUsersList(result.users);
+              if (result.data) setInventory(result.data);
+              if (result.stores) setStores(result.stores);
+              if (result.movements) setMovements(result.movements);
+              if (result.incidents) setIncidents(result.incidents);
+            }
+          } catch (error) {
+            console.warn("Fallo de red al inicio, usando datos locales.", error);
+          } finally {
+            setIsAppLoading(false);
+          }
+        };
+        initialLoad();
+      }, []);
 
       const handleLogin = (e) => {
         e.preventDefault();
-        
-        // Obtener lo que el usuario escribió en los campos
         const inputUser = e.target.username.value.trim();
         const inputPass = e.target.password.value.trim();
         
-        // Buscar si el usuario existe en la base de datos (Google Sheets o local)
-        const foundUser = usersList.find(u => u.usuario === inputUser);
+        const foundUser = usersList.find(u => 
+          String(u.usuario).toLowerCase() === inputUser.toLowerCase() && 
+          String(u.password) === inputPass
+        );
         
         if (foundUser) {
-          // Asignar el nombre REAL de la base de datos al operador activo
           setUser({ name: foundUser.nombre, role: foundUser.rol, username: foundUser.usuario });
-          setView('dashboard');
+          setView(foundUser.rol === 'Operador' ? 'mobile' : 'dashboard');
         } else {
-          alert("Credenciales incorrectas. Verifique su usuario y PIN en la pestaña de Usuarios.");
+          alert("Credenciales incorrectas. Verifique su usuario y PIN en la base de datos.");
         }
       };
 
@@ -148,11 +128,24 @@
             if (result.incidents) setIncidents(result.incidents); 
           }
         } catch (error) {
-          console.warn("Aviso de red (Sincronización):", error.message, "- Manteniendo datos locales.");
+          alert("Error de sincronización con Google Sheets.");
         } finally {
           setLoading(false);
         }
       };
+
+      // Pantalla de Carga Inicial
+      if (isAppLoading) {
+        return (
+          <div className="flex items-center justify-center min-h-screen bg-slate-900">
+            <div className="text-white text-center loader-pulse">
+              <i className="fa-solid fa-spinner fa-spin text-5xl mb-6 text-blue-500"></i>
+              <h2 className="text-xl font-black uppercase tracking-widest text-slate-300">Conectando a Base de Datos</h2>
+              <p className="text-slate-500 text-xs font-bold mt-2">Sincronizando Usuarios y Catálogos...</p>
+            </div>
+          </div>
+        );
+      }
 
       if (view === 'login') return <LoginScreen onLogin={handleLogin} />;
 
@@ -164,14 +157,14 @@
               className={`p-3 rounded-full shadow-lg transition-all ${view === 'mobile' ? 'bg-orange-600 text-white' : 'bg-white text-orange-600 border border-orange-600'}`}
               title="Modo Handheld RF"
             >
-              <i className="fa-solid fa-barcode text-2xl"></i>
+              <i className="fa-solid fa-barcode text-xl"></i>
             </button>
             <button 
               onClick={() => setView('dashboard')}
               className={`p-3 rounded-full shadow-lg transition-all ${view === 'dashboard' ? 'bg-blue-600 text-white' : 'bg-white text-blue-600 border border-blue-600'}`}
               title="Dashboard PC"
             >
-              <i className="fa-solid fa-chart-pie text-2xl"></i>
+              <i className="fa-solid fa-chart-pie text-xl"></i>
             </button>
           </div>
 
@@ -197,11 +190,11 @@
           <form onSubmit={onLogin} className="space-y-4">
             <div>
               <label className="block text-[10px] font-black text-slate-500 mb-1 uppercase tracking-widest">Identificador Usuario</label>
-              <input name="username" type="text" defaultValue="admin" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+              <input name="username" type="text" placeholder="Ej. operador1" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" required />
             </div>
             <div>
               <label className="block text-[10px] font-black text-slate-500 mb-1 uppercase tracking-widest">PIN de Acceso</label>
-              <input name="password" type="password" defaultValue="123456" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" />
+              <input name="password" type="password" placeholder="••••••••" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" required />
             </div>
             <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl transition-all shadow-xl uppercase tracking-wider mt-4">
               Iniciar Sesión
@@ -273,29 +266,8 @@
               throw new Error(result?.message || "Error en servidor");
             }
           } catch (error) {
-             console.warn("Fallo en red de entorno. Usando Fallback local:", error.message);
-             const newIncidents = scannedItems.map((id, index) => ({
-               id: `INC-${Date.now()}-${index}`,
-               activoId: id,
-               tipo: incidentType === 'Dañada' ? 'Daño' : 'Pérdida',
-               descripcion: incidentDesc || 'Reportado vía RF',
-               fecha: new Date().toISOString().split('T')[0],
-               usuario: user.name
-             }));
-             setIncidents([...incidents, ...newIncidents]);
-             
-             const updatedInventory = inventory.map(item => {
-               if (scannedItems.includes(item.id)) {
-                 return { ...item, estatus: incidentType };
-               }
-               return item;
-             });
-             setInventory(updatedInventory);
-
-             setStatusMessage({ type: 'success', text: 'GUARDADO (LOCAL)' });
-             setTimeout(() => {
-               resetForm();
-             }, 1500);
+             alert(`❌ Error al guardar: ${error.message}`);
+             setStatusMessage({ type: 'error', text: 'ERROR' });
           } finally {
             setIsSyncing(false);
           }
@@ -346,7 +318,7 @@
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {statusMessage && (
-              <div className={`p-5 rounded-xl font-black text-center text-2xl shadow-lg animate-bounce ${
+              <div className={`p-5 rounded-xl font-black text-center text-2xl shadow-lg animate-pulse ${
                 statusMessage.type === 'error' ? 'bg-red-600' : 
                 statusMessage.type === 'info' ? 'bg-blue-600' : 'bg-green-600'
               }`}>
@@ -516,19 +488,33 @@
         setSearchTerm(''); 
       };
 
-      // Separación estricta de Placas y Hieleras con reconocimiento flexible de estatus
+      // Separación estricta de Placas y Hieleras con reconocimiento flexible a prueba de errores
       const stats = useMemo(() => {
-        const getStats = (tipo) => {
-          // Filtrado flexible ignorando mayúsculas/minúsculas y espacios
-          const filtered = inventory.filter(i => String(i.tipo).trim().toLowerCase() === String(tipo).toLowerCase());
+        const getStats = (tipoStr) => {
+          const isPlaca = tipoStr === 'Placa';
+          
+          const filtered = inventory.filter(i => {
+             const idText = String(i.id || '').trim().toUpperCase();
+             const tipoText = String(i.tipo || '').trim().toUpperCase();
+             
+             if (isPlaca) {
+               return tipoText.includes('PLACA') || idText.startsWith('P-') || idText.startsWith('P');
+             } else {
+               return tipoText.includes('HIELERA') || idText.startsWith('H-') || idText.startsWith('H');
+             }
+          });
+
           return {
             total: filtered.length,
             enCedis: filtered.filter(i => String(i.estatus).trim().toUpperCase() === 'CEDIS').length,
             enTienda: filtered.filter(i => String(i.estatus).trim().toUpperCase() === 'EN TIENDA').length,
             dañadas: filtered.filter(i => {
               const estatusTexto = String(i.estatus).trim().toLowerCase();
-              // Busca coincidencias exactas incluyendo los términos "Daño" y "Pérdida" con sus acentos
-              return estatusTexto === 'daño' || estatusTexto === 'pérdida' || estatusTexto === 'dañada' || estatusTexto === 'perdida';
+              return estatusTexto.includes('dañ') || 
+                     estatusTexto.includes('perdid') || 
+                     estatusTexto.includes('pérdid') || 
+                     estatusTexto.includes('fuera de servicio') ||
+                     estatusTexto === 'daño';
             }).length
           };
         };
@@ -555,7 +541,7 @@
         }).sort((a, b) => b.stock - a.stock);
       }, [stores, inventory]);
 
-      // --- TRADUCTOR DE FECHAS A PRUEBA DE FALLOS PARA LA GRÁFICA (CON DESGLOSE) ---
+      // --- TRADUCTOR DE FECHAS A PRUEBA DE FALLOS PARA LA GRÁFICA (CON DESGLOSE ENTRADAS/SALIDAS) ---
       const chartData = useMemo(() => {
         const activityMap = {};
         
@@ -565,7 +551,6 @@
           let dateKey = "";
           let rawDate = String(m.fecha).trim();
           
-          // Extractor de números para atrapar CUALQUIER formato: DD/MM/YYYY, YYYY-MM-DD, MM-DD-YYYY
           const parts = rawDate.match(/(\d{1,4})[\/\-](\d{1,2})[\/\-](\d{1,4})/);
           
           if (parts) {
@@ -579,20 +564,19 @@
             } else if (p3.length === 4) {
               y = p3;
               if (parseInt(p2) > 12) { m_part = p1; d = p2; }
-              else { d = p1; m_part = p2; } // Default a DD/MM
+              else { d = p1; m_part = p2; } 
             } else {
               y = "20" + p3.slice(-2); d = p1; m_part = p2;
             }
             dateKey = `${y}-${String(m_part).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
           } else {
-             // Fallback
              const dObj = new Date(rawDate);
              if (!isNaN(dObj.getTime())) {
                 dateKey = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(dObj.getDate()).padStart(2, '0')}`;
              }
           }
 
-          if (!dateKey) return; // Ignorar si no se pudo extraer la fecha
+          if (!dateKey) return; 
           
           if (!activityMap[dateKey]) {
             activityMap[dateKey] = { entradas: 0, salidas: 0, total: 0 };
@@ -608,7 +592,6 @@
           activityMap[dateKey].total += numAssets;
         });
 
-        // Siempre usamos el día actual como punto de referencia final para los 12 días
         const endDate = new Date();
 
         const dataItems = [];
@@ -633,7 +616,6 @@
           });
         }
 
-        // Buscamos el valor más alto entre entradas o salidas para la escala de la gráfica
         const maxValue = Math.max(...dataItems.map(d => Math.max(d.entradas, d.salidas)), 5); 
         
         return dataItems.map(d => ({
@@ -764,10 +746,12 @@
               
               <div className="flex items-center justify-between gap-2 p-4 bg-slate-800/40 rounded-2xl border border-slate-800">
                 <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-black text-sm shadow-lg">AD</div>
+                  <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-black text-sm shadow-lg">
+                    {user.name.substring(0, 2).toUpperCase()}
+                  </div>
                   <div className="overflow-hidden">
                     <p className="font-black text-slate-200 text-sm truncate uppercase tracking-tight">{user.name}</p>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Superusuario</p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{user.role}</p>
                   </div>
                 </div>
                 <button 
