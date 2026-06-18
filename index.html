@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hieleras System - Standalone</title>
 
-  <!-- Atrapador de Errores para evitar pantallas blancas -->
+  <!-- Atrapador de Errores para evitar la "pantalla blanca" -->
   <script>
     window.onerror = function(message, source, lineno, colno, error) {
       document.body.innerHTML = `
@@ -20,15 +20,15 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- FontAwesome -->
+  <!-- FontAwesome (Iconos rápidos y compatibles con HTML puro) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <!-- React & ReactDOM -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
 
-  <!-- Babel para compilar JSX -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Babel para compilar JSX en el navegador -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.3/babel.min.js" crossorigin></script>
 
   <style>
     ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -43,12 +43,14 @@
   
   <div id="root"></div>
 
+  <!-- AQUI EMPIEZA EL SCRIPT SIN IMPORTS -->
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
-    // --- API DE GOOGLE SHEETS ---
-    const API_URL = "https://script.google.com/macros/s/AKfycbyMOIUKh7WQgD6c74fOyeUcUnhN8D5ZUWiyErOb1ouaz4fyk2dZ7wF6tBzBJ57We3xy/exec";
+    // --- CONFIGURACIÓN DE API ---
+    const API_URL = "https://script.google.com/macros/s/AKfycbzcUOt003D02aKsQF8K_693RTBN3HdX_45Pn9Dg3MloxKrIElfwi-2xEtG9vPkuokVywQ/exec";
 
+    // --- CONECTOR MAESTRO GOOGLE SHEETS (Previene Error CORS) ---
     const fetchAPI = async (payloadObj) => {
       const response = await fetch(API_URL, {
         method: 'POST',
@@ -67,10 +69,12 @@
       }
     };
 
+    // --- MOCK DATA INICIAL ---
     const INITIAL_USERS = [
       { id: 'U-01', usuario: 'admin', password: 'admin', nombre: 'Administrador Local', rol: 'Superusuario' }
     ];
 
+    // --- COMPONENTE PRINCIPAL ---
     const App = () => {
       const [view, setView] = useState('login'); 
       const [user, setUser] = useState(null);
@@ -82,7 +86,6 @@
       const [isAppLoading, setIsAppLoading] = useState(true); 
       const [loading, setLoading] = useState(false); 
 
-      // --- DESCARGA DE DATOS ANTES DE INICIAR SESIÓN ---
       useEffect(() => {
         const initialLoad = async () => {
           try {
@@ -95,7 +98,7 @@
               if (result.incidents) setIncidents(result.incidents);
             }
           } catch (error) {
-            console.warn("Fallo de red al inicio.", error);
+            console.warn("Fallo de red al inicio, usando datos locales.", error);
           } finally {
             setIsAppLoading(false);
           }
@@ -117,7 +120,7 @@
           setUser({ name: foundUser.nombre, role: foundUser.rol, username: foundUser.usuario });
           setView(foundUser.rol === 'Operador' ? 'mobile' : 'dashboard');
         } else {
-          alert("Credenciales incorrectas. Verifique su usuario y contraseña.");
+          alert("Credenciales incorrectas. Verifique su usuario y PIN.");
         }
       };
 
@@ -144,7 +147,7 @@
           <div className="flex items-center justify-center min-h-screen bg-slate-900">
             <div className="text-white text-center loader-pulse">
               <i className="fa-solid fa-spinner fa-spin text-5xl mb-6 text-blue-500"></i>
-              <h2 className="text-xl font-black uppercase tracking-widest text-slate-300">Conectando a Base de Datos</h2>
+              <h2 className="text-xl font-black uppercase tracking-widest text-slate-300">Conectando a BD</h2>
             </div>
           </div>
         );
@@ -184,7 +187,7 @@
         <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 border-blue-600">
           <div className="flex flex-col items-center mb-8">
             <div className="bg-blue-600 p-4 rounded-xl mb-4 shadow-lg text-white">
-              <i className="fa-solid fa-truck text-4xl"></i>
+              <i className="fa-solid fa-truck text-4xl text-white"></i>
             </div>
             <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Hieleras System</h1>
             <p className="text-slate-500 text-sm font-medium">Control de Inventario RF</p>
@@ -192,11 +195,11 @@
           <form onSubmit={onLogin} className="space-y-4">
             <div>
               <label className="block text-[10px] font-black text-slate-500 mb-1 uppercase tracking-widest">Identificador Usuario</label>
-              <input name="username" type="text" placeholder="Ej. operador1" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
+              <input name="username" type="text" placeholder="Ej. operador1" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" required />
             </div>
             <div>
               <label className="block text-[10px] font-black text-slate-500 mb-1 uppercase tracking-widest">PIN de Acceso</label>
-              <input name="password" type="password" placeholder="••••••••" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
+              <input name="password" type="password" placeholder="••••••••" className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" required />
             </div>
             <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl transition-all shadow-xl uppercase tracking-wider mt-4">
               Iniciar Sesión
@@ -248,48 +251,32 @@
           try {
             const result = await fetchAPI({
               action: 'registrarIncidencia',
-              payload: {
-                tipo: incidentType === 'Dañada' ? 'Daño' : 'Pérdida',
-                descripcion: incidentDesc || 'Reportado vía RF',
-                usuario: user.name,
-                activos: scannedItems
-              }
+              payload: { tipo: incidentType === 'Dañada' ? 'Daño' : 'Pérdida', descripcion: incidentDesc || 'RF', usuario: user.name, activos: scannedItems }
             });
             if (result && result.status === 'success') {
               setStatusMessage({ type: 'success', text: 'REGISTRADO' });
               setTimeout(() => { resetForm(); onUpdate(); }, 1500);
             }
-          } catch (e) {
-            setStatusMessage({ type: 'error', text: 'ERROR' });
-            alert(e.message);
-          } finally { setIsSyncing(false); }
+          } catch (e) { setStatusMessage({ type: 'error', text: 'ERROR' }); }
+          finally { setIsSyncing(false); }
           return;
         }
 
         try {
           const result = await fetchAPI({
             action: 'registrarMovimiento',
-            payload: {
-              tipo: screen === 'salida' ? 'Salida' : 'Entrada',
-              tienda: selectedStore || 'CEDIS',
-              usuario: user.name,
-              activos: scannedItems,
-              grupo: screen === 'salida' ? grupo : '', 
-              entregas: screen === 'salida' ? entregas : '' 
-            }
+            payload: { tipo: screen === 'salida' ? 'Salida' : 'Entrada', tienda: selectedStore || 'CEDIS', usuario: user.name, activos: scannedItems, grupo: screen === 'salida' ? grupo : '', entregas: screen === 'salida' ? entregas : '' }
           });
           if (result && result.status === 'success') {
-            setStatusMessage({ type: 'success', text: 'GUARDADO' });
+            setStatusMessage({ type: 'success', text: 'ÉXITO' });
             setTimeout(() => { resetForm(); onUpdate(); }, 1500);
           }
-        } catch (e) {
-          setStatusMessage({ type: 'error', text: 'ERROR RED' });
-          alert(e.message);
-        } finally { setIsSyncing(false); }
+        } catch (e) { setStatusMessage({ type: 'error', text: 'ERROR' }); }
+        finally { setIsSyncing(false); }
       };
 
       return (
-        <div className="max-w-md mx-auto h-screen bg-slate-950 flex flex-col text-white shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+        <div className="max-w-md mx-auto h-screen bg-slate-950 flex flex-col text-white shadow-2xl">
           <div className="p-4 bg-slate-900 border-b-2 border-slate-800 flex justify-between items-center">
             <div>
               <p className="text-[10px] text-slate-500 font-black uppercase italic">Handheld Terminal</p>
@@ -298,7 +285,7 @@
               </h2>
             </div>
             <button onClick={() => window.location.reload()} className="p-2 bg-slate-800 rounded-lg text-slate-400">
-              <i className="fa-solid fa-sign-out-alt text-xl"></i>
+              <i className="fa-solid fa-right-from-bracket text-xl"></i>
             </button>
           </div>
 
@@ -311,17 +298,14 @@
 
             {screen === 'menu' && (
               <div className="flex flex-col gap-4 py-4">
-                <button onClick={() => setScreen('salida')} className="bg-orange-600 p-6 rounded-3xl flex flex-col items-center gap-3 active:scale-95 shadow-[0_8px_0_rgb(154,52,18)] border-2 border-orange-400">
-                  <i className="fa-solid fa-truck text-4xl"></i>
-                  <span className="font-black text-xl">SALIDA TIENDA</span>
+                <button onClick={() => setScreen('salida')} className="bg-orange-600 p-6 rounded-3xl flex flex-col items-center gap-3 active:scale-95 shadow-lg border-2 border-orange-400">
+                  <i className="fa-solid fa-truck text-4xl"></i><span className="font-black text-xl">SALIDA TIENDA</span>
                 </button>
-                <button onClick={() => setScreen('entrada')} className="bg-blue-600 p-6 rounded-3xl flex flex-col items-center gap-3 active:scale-95 shadow-[0_8px_0_rgb(29,78,216)] border-2 border-blue-400">
-                  <i className="fa-solid fa-box text-4xl"></i>
-                  <span className="font-black text-xl">ENTRADA CEDIS</span>
+                <button onClick={() => setScreen('entrada')} className="bg-blue-600 p-6 rounded-3xl flex flex-col items-center gap-3 active:scale-95 shadow-lg border-2 border-blue-400">
+                  <i className="fa-solid fa-box text-4xl"></i><span className="font-black text-xl">ENTRADA CEDIS</span>
                 </button>
-                <button onClick={() => setScreen('incidencia')} className="bg-red-600 p-6 rounded-3xl flex flex-col items-center gap-3 active:scale-95 shadow-[0_8px_0_rgb(185,28,28)] border-2 border-red-400">
-                  <i className="fa-solid fa-circle-exclamation text-4xl"></i>
-                  <span className="font-black text-xl">REPORTAR INCIDENCIA</span>
+                <button onClick={() => setScreen('incidencia')} className="bg-red-600 p-6 rounded-3xl flex flex-col items-center gap-3 active:scale-95 shadow-lg border-2 border-red-400">
+                  <i className="fa-solid fa-triangle-exclamation text-4xl"></i><span className="font-black text-xl">INCIDENCIA</span>
                 </button>
               </div>
             )}
@@ -334,41 +318,46 @@
                       <option value="">-- ELIGE DESTINO --</option>
                       {stores.map((s, idx) => <option key={idx} value={s.nombre}>{s.nombre}</option>)}
                     </select>
-                    <input type="text" value={grupo} onChange={(e) => setGrupo(e.target.value)} placeholder="Grupo(s) Ej. 1, 2" className="w-full bg-slate-800 p-4 rounded-xl border-2 border-slate-700 text-lg font-black outline-none focus:border-orange-500" />
-                    <input type="text" value={entregas} onChange={(e) => setEntregas(e.target.value)} placeholder="Entrega(s) Ej. 4, 8" className="w-full bg-slate-800 p-4 rounded-xl border-2 border-slate-700 text-lg font-black outline-none focus:border-orange-500" />
+                    <input type="text" value={grupo} onChange={(e) => setGrupo(e.target.value)} placeholder="Grupo(s)" className="w-full bg-slate-800 p-4 rounded-xl border-2 border-slate-700 text-lg font-black outline-none focus:border-orange-500" />
+                    <input type="text" value={entregas} onChange={(e) => setEntregas(e.target.value)} placeholder="Entrega(s)" className="w-full bg-slate-800 p-4 rounded-xl border-2 border-slate-700 text-lg font-black outline-none focus:border-orange-500" />
                   </div>
                 )}
 
                 {screen === 'incidencia' && (
                   <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-4">
-                    <select className="w-full bg-slate-800 p-4 rounded-xl border-2 border-slate-700 text-xl font-black focus:border-red-500 appearance-none text-red-400" onChange={(e) => setIncidentType(e.target.value)} value={incidentType}>
-                      <option value="Dañada">Activo Dañado</option>
-                      <option value="Perdida">Activo Perdido</option>
+                    <select className="w-full bg-slate-800 p-4 rounded-xl border-2 border-slate-700 text-xl font-black text-red-400" onChange={(e) => setIncidentType(e.target.value)} value={incidentType}>
+                      <option value="Dañada">Activo Dañado</option><option value="Perdida">Activo Perdido</option>
                     </select>
-                    <input type="text" value={incidentDesc} onChange={(e) => setIncidentDesc(e.target.value)} placeholder="Detalles (Opcional)" className="w-full bg-slate-800 border-2 border-slate-700 p-3 rounded-xl font-bold focus:border-red-500 outline-none" />
+                    <input type="text" value={incidentDesc} onChange={(e) => setIncidentDesc(e.target.value)} placeholder="Detalles" className="w-full bg-slate-800 border-2 border-slate-700 p-3 rounded-xl focus:border-red-500 outline-none" />
                   </div>
                 )}
 
                 <div className="bg-slate-900 p-5 rounded-2xl border-2 border-slate-800">
-                  <div className="flex justify-between items-center mb-2">
-                    <label className={`text-[10px] font-black uppercase ${screen === 'incidencia' ? 'text-red-500' : 'text-orange-500'}`}>Esperando Escaneo...</label>
-                    <i className={`fa-solid fa-barcode text-base animate-pulse ${screen === 'incidencia' ? 'text-red-500' : 'text-orange-500'}`}></i>
+                  <div className="flex justify-between items-center mb-2 text-orange-500">
+                    <label className="text-[10px] font-black uppercase">Esperando Escaneo...</label>
+                    <i className="fa-solid fa-barcode text-base animate-pulse"></i>
                   </div>
-                  <input type="text" value={inputCode} onChange={(e) => setInputCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addScan(inputCode)} className={`w-full bg-black border-2 border-slate-700 p-5 rounded-xl text-4xl font-mono font-bold outline-none uppercase tracking-widest ${screen === 'incidencia' ? 'text-red-400 focus:border-red-500' : 'text-green-400 focus:border-green-500'}`} autoFocus placeholder="..." />
+                  <input type="text" value={inputCode} onChange={(e) => setInputCode(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addScan(inputCode)} className="w-full bg-black border-2 border-slate-700 p-5 rounded-xl text-4xl font-mono font-bold text-green-400 outline-none uppercase tracking-widest shadow-inner" autoFocus placeholder="..." />
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex justify-between items-center px-1">
-                    <h3 className="text-xs font-black text-slate-500 uppercase">Activos: {scannedItems.length}</h3>
+                    <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">Escaneados: {scannedItems.length}</h3>
                     <button onClick={() => setScannedItems([])} className="text-[10px] text-red-500 font-black uppercase underline">Limpiar</button>
                   </div>
                   <div className="bg-black/50 rounded-2xl max-h-[35vh] overflow-y-auto divide-y divide-slate-800 border border-slate-800">
-                    {scannedItems.map((code, idx) => (
-                      <div key={idx} className="p-4 flex justify-between items-center">
-                        <span className="font-mono text-2xl font-black text-slate-200">{code}</span>
-                        <i className="fa-solid fa-check-circle text-green-500 text-2xl"></i>
+                    {scannedItems.length === 0 ? (
+                      <div className="p-12 text-center text-slate-800">
+                        <i className="fa-solid fa-clipboard-list text-5xl mb-2 mx-auto"></i>
                       </div>
-                    ))}
+                    ) : (
+                      scannedItems.map((code, idx) => (
+                        <div key={idx} className="p-4 flex justify-between items-center animate-in slide-in-from-left duration-200">
+                          <span className="font-mono text-2xl font-black text-slate-200">{code}</span>
+                          <i className="fa-solid fa-circle-check text-green-500 text-2xl"></i>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
@@ -378,8 +367,8 @@
           {(screen === 'salida' || screen === 'entrada' || screen === 'incidencia') && (
             <div className="p-4 bg-slate-900 grid grid-cols-2 gap-4 border-t-2 border-slate-800">
               <button onClick={resetForm} disabled={isSyncing} className="p-5 bg-slate-800 font-black rounded-2xl uppercase text-xs disabled:opacity-50">ATRÁS</button>
-              <button onClick={handleConfirm} disabled={scannedItems.length === 0 || (screen === 'salida' && !selectedStore) || isSyncing} className={`p-5 font-black rounded-2xl uppercase text-xs flex items-center justify-center gap-2 ${scannedItems.length > 0 && !isSyncing ? (screen === 'incidencia' ? 'bg-red-600' : 'bg-green-600') : 'bg-slate-700 text-slate-400'}`}>
-                {isSyncing ? <i className="fa-solid fa-spinner fa-spin"></i> : 'GUARDAR'}
+              <button onClick={handleConfirm} disabled={scannedItems.length === 0 || (screen === 'salida' && !selectedStore) || isSyncing} className={`p-5 font-black rounded-2xl uppercase text-xs flex items-center justify-center gap-2 transition-all ${scannedItems.length > 0 && !isSyncing ? (screen === 'incidencia' ? 'bg-red-600' : 'bg-green-600') : 'bg-slate-700 text-slate-400'}`}>
+                {isSyncing ? <i className="fa-solid fa-spinner fa-spin text-lg"></i> : 'GUARDAR'}
               </button>
             </div>
           )}
@@ -389,9 +378,14 @@
 
     const WebDashboard = ({ user, inventory, setInventory, incidents, movements, loading, onRefresh, setView, stores, setStores, usersList, setUsersList }) => {
       const [activeTab, setActiveTab] = useState('overview');
-      const [searchTerm, setSearchTerm] = useState('');
       const [showModal, setShowModal] = useState(null); 
       const [isSaving, setIsSaving] = useState(false);
+      const [searchTerm, setSearchTerm] = useState('');
+
+      const changeTab = (tab) => {
+        setActiveTab(tab);
+        setSearchTerm(''); 
+      };
 
       const stats = useMemo(() => {
         const getStats = (isPlaca) => {
@@ -457,13 +451,12 @@
       }, [movements]);
 
       const lS = searchTerm.toLowerCase();
-      const filteredInventory = inventory.filter(i => String(i.id).toLowerCase().includes(lS) || String(i.tipo).toLowerCase().includes(lS));
-      const filteredStores = stores.filter(s => String(s.nombre).toLowerCase().includes(lS) || String(s.zona).toLowerCase().includes(lS));
-      const filteredUsers = usersList.filter(u => String(u.nombre).toLowerCase().includes(lS) || String(u.usuario).toLowerCase().includes(lS));
-      const filteredIncidents = incidents.filter(i => String(i.activoId).toLowerCase().includes(lS));
-      const filteredMovements = movements.filter(m => String(m.folio).toLowerCase().includes(lS) || String(m.tienda).toLowerCase().includes(lS));
+      const filteredInventory = inventory.filter(i => String(i.id).toLowerCase().includes(lS) || String(i.tipo).toLowerCase().includes(lS) || String(i.ubicacion).toLowerCase().includes(lS));
+      const filteredStores = stores.filter(s => String(s.nombre).toLowerCase().includes(lS) || String(s.zona).toLowerCase().includes(lS) || String(s.id).toLowerCase().includes(lS));
+      const filteredUsers = usersList.filter(u => String(u.nombre).toLowerCase().includes(lS) || String(u.usuario).toLowerCase().includes(lS) || String(u.rol).toLowerCase().includes(lS));
+      const filteredIncidents = incidents.filter(i => String(i.activoId).toLowerCase().includes(lS) || String(i.descripcion).toLowerCase().includes(lS));
+      const filteredMovements = movements.filter(m => String(m.folio).toLowerCase().includes(lS) || String(m.tienda).toLowerCase().includes(lS) || String(m.activos).toLowerCase().includes(lS));
 
-      // --- FUNCIÓN DE EXPORTACIÓN A EXCEL (CSV) ---
       const handleDownloadExcel = () => {
         let dataToExport = [];
         let headers = [];
@@ -480,18 +473,18 @@
             break;
           case 'users':
             headers = ['ID Usuario', 'Nombre Completo', 'Credencial', 'Nivel'];
-            dataToExport = filteredUsers.map(u => [u.usuario, u.nombre, u.usuario, u.rol]);
+            dataToExport = filteredUsers.map(u => [u.id, u.nombre, u.usuario, u.rol]);
             break;
           case 'incidents':
             headers = ['ID Incidencia', 'Activo', 'Tipo', 'Detalles', 'Fecha', 'Usuario'];
             dataToExport = filteredIncidents.map(inc => [inc.id, inc.activoId, inc.tipo, inc.descripcion, inc.fecha, inc.usuario]);
             break;
           case 'moves':
-            headers = ['Folio de Operación', 'Fecha y Hora', 'Tipo', 'Destino / Origen', 'Usuario', 'Activos Movidos'];
-            dataToExport = filteredMovements.map(m => [m.folio, m.fecha, m.tipo, m.tienda, m.usuario, m.activos]);
+            headers = ['Folio de Operación', 'Fecha y Hora', 'Tipo', 'Destino / Origen', 'Usuario', 'Grupo', 'Entregas', 'Activos Movidos', 'PDF'];
+            dataToExport = filteredMovements.map(m => [m.folio, m.fecha, m.tipo, m.tienda, m.usuario, m.grupo || '', m.entregas || '', m.activos, m.pdf || '']);
             break;
           default:
-            alert('Ve a una pestaña con tabla para descargar el reporte.');
+            alert('Navega a Inventario, Tiendas, Usuarios, Incidencias o Histórico para descargar su tabla correspondiente.');
             return;
         }
 
@@ -515,35 +508,56 @@
           <aside className="w-72 bg-slate-900 text-white flex flex-col shadow-2xl z-20">
             <div className="p-8 border-b border-slate-800">
               <div className="flex items-center gap-4">
-                <div className="bg-blue-600 p-3 rounded-2xl shadow-lg"><i className="fa-solid fa-truck text-2xl"></i></div>
-                <div><span className="font-black text-2xl uppercase block leading-none">Hieleras</span><span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Admin Panel v2</span></div>
+                <div className="bg-blue-600 p-3 rounded-2xl shadow-lg">
+                  <i className="fa-solid fa-truck text-3xl"></i>
+                </div>
+                <div>
+                  <span className="font-black text-2xl tracking-tighter uppercase block leading-none">Hieleras</span>
+                  <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Admin Panel v2</span>
+                </div>
               </div>
             </div>
+            
             <nav className="flex-1 p-6 space-y-3 overflow-y-auto">
-              <NavItem icon={<i className="fa-solid fa-chart-pie"></i>} label="General" active={activeTab === 'overview'} onClick={() => {setActiveTab('overview'); setSearchTerm('');}} />
-              <NavItem icon={<i className="fa-solid fa-box"></i>} label="Inventario" active={activeTab === 'inventory'} onClick={() => {setActiveTab('inventory'); setSearchTerm('');}} />
-              <NavItem icon={<i className="fa-solid fa-store"></i>} label="Tiendas" active={activeTab === 'stores'} onClick={() => {setActiveTab('stores'); setSearchTerm('');}} />
-              <NavItem icon={<i className="fa-solid fa-users"></i>} label="Usuarios" active={activeTab === 'users'} onClick={() => {setActiveTab('users'); setSearchTerm('');}} />
-              <NavItem icon={<i className="fa-solid fa-circle-exclamation"></i>} label="Incidencias" active={activeTab === 'incidents'} onClick={() => {setActiveTab('incidents'); setSearchTerm('');}} />
-              <NavItem icon={<i className="fa-solid fa-exchange-alt"></i>} label="Histórico" active={activeTab === 'moves'} onClick={() => {setActiveTab('moves'); setSearchTerm('');}} />
+              <NavItem icon={<i className="fa-solid fa-chart-pie text-xl"></i>} label="General" active={activeTab === 'overview'} onClick={() => changeTab('overview')} />
+              <NavItem icon={<i className="fa-solid fa-box text-xl"></i>} label="Inventario" active={activeTab === 'inventory'} onClick={() => changeTab('inventory')} />
+              <NavItem icon={<i className="fa-solid fa-store text-xl"></i>} label="Tiendas" active={activeTab === 'stores'} onClick={() => changeTab('stores')} />
+              <NavItem icon={<i className="fa-solid fa-users text-xl"></i>} label="Usuarios" active={activeTab === 'users'} onClick={() => changeTab('users')} />
+              <NavItem icon={<i className="fa-solid fa-triangle-exclamation text-xl"></i>} label="Incidencias" active={activeTab === 'incidents'} onClick={() => changeTab('incidents')} />
+              <NavItem icon={<i className="fa-solid fa-arrow-right-arrow-left text-xl"></i>} label="Histórico" active={activeTab === 'moves'} onClick={() => changeTab('moves')} />
             </nav>
+
             <div className="p-6 border-t border-slate-800 space-y-4">
-              <button onClick={onRefresh} disabled={loading} className="w-full flex items-center justify-center gap-3 p-4 bg-blue-600/10 text-blue-400 rounded-2xl text-xs font-black uppercase tracking-widest border border-blue-600/30 hover:bg-blue-600/20 disabled:opacity-50">
-                {loading ? <i className="fa-solid fa-spinner fa-spin"></i> : <i className="fa-solid fa-sync"></i>} Sync Sheets
+              <button 
+                onClick={onRefresh} 
+                disabled={loading} 
+                className="w-full flex items-center justify-center gap-3 p-4 bg-blue-600/10 text-blue-400 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-600/20 transition-all border border-blue-600/30 disabled:opacity-50"
+              >
+                {loading ? <i className="fa-solid fa-spinner fa-spin text-base"></i> : <i className="fa-solid fa-arrow-right-arrow-left text-base"></i>} 
+                Sync Sheets
               </button>
-              <div className="flex items-center justify-between p-4 bg-slate-800/40 rounded-2xl border border-slate-800">
-                <div className="flex items-center gap-3 truncate">
-                  <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-black text-sm shadow-lg">{user.name.substring(0,2).toUpperCase()}</div>
-                  <div className="truncate"><p className="font-black text-slate-200 text-sm truncate uppercase">{user.name}</p><p className="text-[10px] text-slate-500 font-bold uppercase">{user.role}</p></div>
+              
+              <div className="flex items-center justify-between gap-2 p-4 bg-slate-800/40 rounded-2xl border border-slate-800">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-black text-sm shadow-lg">AD</div>
+                  <div className="overflow-hidden">
+                    <p className="font-black text-slate-200 text-sm truncate uppercase tracking-tight">{user.name}</p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Superusuario</p>
+                  </div>
                 </div>
-                <button onClick={() => window.location.reload()} className="p-2 text-slate-400 hover:text-red-400"><i className="fa-solid fa-sign-out-alt"></i></button>
+                <button 
+                  onClick={() => setView('login')} 
+                  className="p-3 bg-slate-700/50 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-xl transition-all"
+                  title="Cerrar Sesión"
+                >
+                  <i className="fa-solid fa-right-from-bracket text-lg"></i>
+                </button>
               </div>
             </div>
           </aside>
 
           <main className="flex-1 p-10 overflow-y-auto">
-            {/* --- CABECERA DINÁMICA CON BOTONES --- */}
-            <header className="flex justify-between items-end mb-10">
+            <header className="flex justify-between items-end mb-12">
               <div>
                 <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-2">
                   {activeTab === 'overview' && 'Resumen de Flota'}
@@ -553,24 +567,28 @@
                   {activeTab === 'incidents' && 'Registro de Incidencias'}
                   {activeTab === 'moves' && 'Bitácora Logística'}
                 </h1>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                  <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Sincronización Activa con Sheets</p>
+                </div>
               </div>
               <div className="flex gap-4">
-                <button onClick={handleDownloadExcel} className="bg-white border-2 border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2">
-                  <i className="fa-solid fa-download"></i> EXPORTAR CSV
+                <button onClick={handleDownloadExcel} className="bg-white border-2 border-slate-200 text-slate-700 px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
+                  <i className="fa-solid fa-download text-base"></i> Descargar CSV
                 </button>
                 {activeTab === 'inventory' && (
-                  <button onClick={() => setShowModal('item')} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold shadow-xl hover:bg-slate-800 transition-all flex items-center gap-2">
-                    <i className="fa-solid fa-plus"></i> NUEVO ACTIVO
+                  <button onClick={() => setShowModal('item')} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl flex items-center gap-2">
+                    <i className="fa-solid fa-plus text-base"></i> Nuevo Activo
                   </button>
                 )}
                 {activeTab === 'stores' && (
-                  <button onClick={() => setShowModal('store')} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold shadow-xl hover:bg-slate-800 transition-all flex items-center gap-2">
-                    <i className="fa-solid fa-plus"></i> NUEVA TIENDA
+                  <button onClick={() => setShowModal('store')} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl flex items-center gap-2">
+                    <i className="fa-solid fa-plus text-base"></i> Nueva Tienda
                   </button>
                 )}
                 {activeTab === 'users' && (
-                  <button onClick={() => setShowModal('user')} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold shadow-xl hover:bg-slate-800 transition-all flex items-center gap-2">
-                    <i className="fa-solid fa-plus"></i> NUEVO USUARIO
+                  <button onClick={() => setShowModal('user')} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl flex items-center gap-2">
+                    <i className="fa-solid fa-plus text-base"></i> Nuevo Usuario
                   </button>
                 )}
               </div>
@@ -579,100 +597,353 @@
             {activeTab === 'overview' && (
               <div className="space-y-10">
                 <div className="space-y-4">
-                  <h3 className="font-black text-slate-500 uppercase text-xs flex items-center gap-2"><i className="fa-solid fa-box text-blue-500"></i> Resumen de Hieleras</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                    <StatCard label="Total Hieleras" value={stats.hieleras.total} icon={<i className="fa-solid fa-box text-blue-600 text-2xl"></i>} color="blue" />
-                    <StatCard label="Stock CEDIS" value={stats.hieleras.enCedis} icon={<i className="fa-solid fa-check-circle text-green-600 text-2xl"></i>} color="green" />
-                    <StatCard label="En Tiendas" value={stats.hieleras.enTienda} icon={<i className="fa-solid fa-truck text-orange-600 text-2xl"></i>} color="orange" />
-                    <StatCard label="Fuera Servicio" value={stats.hieleras.dañadas} icon={<i className="fa-solid fa-exclamation-triangle text-red-600 text-2xl"></i>} color="red" />
+                  <h3 className="font-black text-slate-500 uppercase tracking-widest text-xs flex items-center gap-2">
+                    <i className="fa-solid fa-box text-blue-500 text-base"></i> Resumen de Hieleras
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <StatCard label="Total Hieleras" value={stats.hieleras.total} icon={<i className="fa-solid fa-box text-blue-600 text-2xl"/>} color="blue" />
+                    <StatCard label="Stock CEDIS" value={stats.hieleras.enCedis} icon={<i className="fa-solid fa-circle-check text-green-600 text-2xl"/>} color="green" />
+                    <StatCard label="En Tiendas" value={stats.hieleras.enTienda} icon={<i className="fa-solid fa-truck text-orange-600 text-2xl"/>} color="orange" />
+                    <StatCard label="Fuera de Servicio" value={stats.hieleras.dañadas} icon={<i className="fa-solid fa-triangle-exclamation text-red-600 text-2xl"/>} color="red" />
                   </div>
                 </div>
+
                 <div className="space-y-4">
-                  <h3 className="font-black text-slate-500 uppercase text-xs flex items-center gap-2"><i className="fa-solid fa-box text-indigo-500"></i> Resumen de Placas</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                    <StatCard label="Total Placas" value={stats.placas.total} icon={<i className="fa-solid fa-box text-indigo-600 text-2xl"></i>} color="blue" />
-                    <StatCard label="Stock CEDIS" value={stats.placas.enCedis} icon={<i className="fa-solid fa-check-circle text-green-600 text-2xl"></i>} color="green" />
-                    <StatCard label="En Tiendas" value={stats.placas.enTienda} icon={<i className="fa-solid fa-truck text-orange-600 text-2xl"></i>} color="orange" />
-                    <StatCard label="Fuera Servicio" value={stats.placas.dañadas} icon={<i className="fa-solid fa-exclamation-triangle text-red-600 text-2xl"></i>} color="red" />
+                  <h3 className="font-black text-slate-500 uppercase tracking-widest text-xs flex items-center gap-2">
+                    <i className="fa-solid fa-box text-indigo-500 text-base"></i> Resumen de Placas
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    <StatCard label="Total Placas" value={stats.placas.total} icon={<i className="fa-solid fa-box text-indigo-600 text-2xl"/>} color="blue" />
+                    <StatCard label="Stock CEDIS" value={stats.placas.enCedis} icon={<i className="fa-solid fa-circle-check text-green-600 text-2xl"/>} color="green" />
+                    <StatCard label="En Tiendas" value={stats.placas.enTienda} icon={<i className="fa-solid fa-truck text-orange-600 text-2xl"/>} color="orange" />
+                    <StatCard label="Fuera de Servicio" value={stats.placas.dañadas} icon={<i className="fa-solid fa-triangle-exclamation text-red-600 text-2xl"/>} color="red" />
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-10">
-                  <div className="col-span-2 bg-white p-10 rounded-3xl border-2 shadow-sm">
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                  <div className="lg:col-span-2 bg-white p-10 rounded-3xl border-2 border-slate-100 shadow-sm flex flex-col">
                     <div className="flex justify-between items-start mb-10">
-                      <h3 className="font-black uppercase text-xl italic">Volumen por Fecha</h3>
+                      <h3 className="font-black text-slate-800 uppercase tracking-tight text-xl italic">Volumen de Movimientos por Fecha</h3>
                       <div className="flex gap-4">
-                        <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-green-500"></span><span className="text-[10px] font-bold text-slate-500 uppercase">Entradas</span></div>
-                        <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-orange-500"></span><span className="text-[10px] font-bold text-slate-500 uppercase">Salidas</span></div>
+                        <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-green-500 shadow-sm"></span><span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Entradas</span></div>
+                        <div className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-orange-500 shadow-sm"></span><span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Salidas</span></div>
                       </div>
                     </div>
                     <div className="h-72 flex items-end justify-between gap-4 px-4">
-                      {chartData.map((d, i) => (
-                        <div key={i} className="flex-1 flex flex-col items-center gap-3 group relative h-full">
-                          <div className="w-full flex items-end justify-center h-full gap-1">
-                            {d.total > 0 && <div className="absolute -top-12 bg-slate-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-20">In: {d.entradas} <br/>Out: {d.salidas}</div>}
-                            <div className="w-full bg-green-500 rounded-t-md transition-all duration-1000" style={{ height: `${d.hIn}%` }}></div>
-                            <div className="w-full bg-orange-500 rounded-t-md transition-all duration-1000" style={{ height: `${d.hOut}%` }}></div>
+                      {chartData.map((item, i) => (
+                        <div key={`chart-col-${i}`} className="flex-1 flex flex-col items-center gap-3 group relative h-full">
+                          <div className="w-full flex items-end justify-center h-full gap-1 relative">
+                            
+                            {(item.total > 0) && (
+                              <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] py-2 px-3 rounded-lg font-black opacity-0 group-hover:opacity-100 transition-all shadow-xl z-20 pointer-events-none whitespace-nowrap flex flex-col items-center leading-tight">
+                                <span className="mb-1 border-b border-slate-700 w-full text-center pb-1">Total: {item.total}</span>
+                                <span className="text-green-400">In: {item.entradas}</span>
+                                <span className="text-orange-400">Out: {item.salidas}</span>
+                              </div>
+                            )}
+
+                            <div className="w-full bg-slate-50 rounded-t-md relative flex flex-col justify-end h-full overflow-hidden border border-slate-100">
+                              <div className="bg-gradient-to-t from-green-500 to-green-400 rounded-t-md w-full transition-all duration-1000 group-hover:brightness-110" style={{ height: `${item.hIn}%` }}></div>
+                            </div>
+                            
+                            <div className="w-full bg-slate-50 rounded-t-md relative flex flex-col justify-end h-full overflow-hidden border border-slate-100">
+                              <div className="bg-gradient-to-t from-orange-500 to-orange-400 rounded-t-md w-full transition-all duration-1000 group-hover:brightness-110" style={{ height: `${item.hOut}%` }}></div>
+                            </div>
+
                           </div>
-                          <span className="text-[10px] font-black text-slate-400 uppercase">{d.label}</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">{item.label}</span>
                         </div>
                       ))}
                     </div>
                   </div>
-                  <div className="bg-white p-10 rounded-3xl border-2 shadow-sm">
-                    <h3 className="font-black uppercase text-xl italic mb-8">Stock por Zona</h3>
-                    <div className="space-y-8 max-h-64 overflow-y-auto">
-                      {zonesStock.map((z, i) => (
-                        <div key={i} className="space-y-3">
-                          <div className="flex justify-between text-[11px] font-black uppercase"><span className="text-slate-600">Zona {z.zona}</span><span className="text-blue-600">{z.stock} UNI</span></div>
-                          <div className="h-3 bg-slate-50 rounded-full border"><div className="h-full bg-blue-600 rounded-full" style={{ width: `${Math.max((z.stock/Math.max(...zonesStock.map(s=>s.stock)))*100, 5)}%` }}></div></div>
-                        </div>
-                      ))}
+                  
+                  <div className="bg-white p-10 rounded-3xl border-2 border-slate-100 shadow-sm">
+                    <h3 className="font-black text-slate-800 uppercase tracking-tight text-xl italic mb-8">Stock por Zona</h3>
+                    <div className="space-y-8 overflow-y-auto max-h-64 pr-2">
+                      {zonesStock.length === 0 ? (
+                        <p className="text-slate-400 text-sm font-bold">No hay zonas registradas</p>
+                      ) : zonesStock.map((z, i) => {
+                        const maxStock = Math.max(...zonesStock.map(st => st.stock), 1);
+                        const width = Math.max((z.stock / maxStock) * 100, 5);
+                        return (
+                          <div key={`zone-stock-${z.zona}-${i}`} className="space-y-3">
+                            <div className="flex justify-between text-[11px] font-black uppercase tracking-tighter">
+                              <span className="text-slate-600 truncate pr-2">Zona {z.zona}</span>
+                              <span className="text-blue-600 shrink-0">{z.stock} UNI</span>
+                            </div>
+                            <div className="h-3 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                              <div className="h-full bg-gradient-to-r from-blue-600 to-indigo-500 rounded-full" style={{ width: `${width}%` }}></div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {activeTab !== 'overview' && (
-              <div className="bg-white rounded-3xl border-2 shadow-sm overflow-hidden">
-                <div className="p-8 bg-slate-50/50"><input value={searchTerm} onChange={(e)=>setSearchTerm(e.target.value)} placeholder="Buscar..." className="w-full p-4 border-2 rounded-2xl outline-none focus:border-blue-600 font-bold text-slate-700" /></div>
+            {activeTab === 'inventory' && (
+              <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
+                <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
+                  <div className="relative flex-1">
+                    <i className="fa-solid fa-magnifying-glass absolute left-5 top-5 text-slate-400 text-xl"></i>
+                    <input 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Buscar por ID, Tipo o Ubicación..." 
+                      className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
+                    />
+                  </div>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
-                    <thead className="bg-slate-50 text-[10px] uppercase font-black text-slate-400 border-b-2">
+                    <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
                       <tr>
-                        {activeTab==='inventory' && <><th className="p-6">ID Activo</th><th className="p-6">Tipo</th><th className="p-6">Estatus</th><th className="p-6">Ubicación</th></>}
-                        {activeTab==='stores' && <><th className="p-6">ID Tienda</th><th className="p-6">Nombre</th><th className="p-6">Zona</th></>}
-                        {activeTab==='users' && <><th className="p-6">Usuario</th><th className="p-6">Nombre</th><th className="p-6">Rol</th></>}
-                        {activeTab==='incidents' && <><th className="p-6">ID Incid.</th><th className="p-6">Activo</th><th className="p-6">Tipo</th><th className="p-6">Fecha</th></>}
-                        {activeTab==='moves' && <><th className="p-6">Folio</th><th className="p-6">Fecha</th><th className="p-6">Tipo</th><th className="p-6">Destino</th><th className="p-6">Operador</th><th className="p-6">Activos</th><th className="p-6">PDF</th></>}
+                        <th className="px-10 py-6">ID Activo</th>
+                        <th className="px-10 py-6">Clasificación</th>
+                        <th className="px-10 py-6">Estatus Operativo</th>
+                        <th className="px-10 py-6">Ubicación Última</th>
+                        <th className="px-10 py-6 text-right">Detalles</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y-2 divide-slate-50 text-sm">
-                      {activeTab==='inventory' && filteredInventory.map((i, idx) => (
-                        <tr key={idx} className="hover:bg-blue-50/40"><td className="p-6 font-mono font-black text-blue-700 text-lg">{i.id}</td><td className="p-6 font-bold uppercase">{i.tipo}</td><td className="p-6"><span className="px-3 py-1 rounded bg-slate-100 font-black text-[10px]">{i.estatus}</span></td><td className="p-6 font-bold text-slate-500">{i.ubicacion}</td></tr>
-                      ))}
-                      {activeTab==='stores' && filteredStores.map((s, idx) => (
-                        <tr key={idx} className="hover:bg-blue-50/40"><td className="p-6 font-mono font-black">{s.id}</td><td className="p-6 font-bold uppercase">{s.nombre}</td><td className="p-6"><span className="px-3 py-1 rounded bg-slate-100 font-black text-[10px]">{s.zona}</span></td></tr>
-                      ))}
-                      {activeTab==='users' && filteredUsers.map((u, idx) => (
-                        <tr key={idx} className="hover:bg-blue-50/40"><td className="p-6 font-mono font-black text-blue-600">{u.usuario}</td><td className="p-6 font-bold uppercase">{u.nombre}</td><td className="p-6 font-bold text-slate-500">{u.rol}</td></tr>
-                      ))}
-                      {activeTab==='incidents' && filteredIncidents.map((inc, idx) => (
-                        <tr key={idx} className="hover:bg-red-50/40"><td className="p-6 font-mono font-black text-red-600">{inc.id}</td><td className="p-6 font-bold uppercase">{inc.activoId}</td><td className="p-6"><span className="px-3 py-1 rounded bg-red-100 text-red-600 font-black text-[10px]">{inc.tipo}</span></td><td className="p-6 font-bold text-slate-500">{inc.fecha}</td></tr>
-                      ))}
-                      
-                      {/* AQUÍ SE APLICA EL ORDEN INVERTIDO PARA LOS MOVIMIENTOS */}
-                      {activeTab==='moves' && [...filteredMovements].reverse().map((m, idx) => (
-                        <tr key={idx} className="hover:bg-blue-50/40">
-                          <td className="p-6 font-mono font-black text-slate-700">{m.folio}</td>
-                          <td className="p-6 font-bold text-slate-500 text-xs">{m.fecha}</td>
-                          <td className="p-6"><span className={`px-3 py-1 rounded text-[10px] font-black uppercase ${m.tipo==='Salida'?'bg-orange-100 text-orange-600':'bg-blue-100 text-blue-600'}`}>{m.tipo}</span></td>
-                          <td className="p-6 font-bold uppercase text-xs">{m.tienda}</td>
-                          <td className="p-6 font-bold uppercase text-xs text-slate-500">{m.usuario}</td>
-                          <td className="p-6 font-mono text-blue-600 text-[10px] max-w-[150px] truncate">{m.activos}</td>
-                          <td className="p-6">{m.pdf && m.pdf.startsWith('http') ? <a href={m.pdf} target="_blank" className="text-blue-500 font-black text-[10px] underline">VER VALE</a> : '-'}</td>
-                        </tr>
-                      ))}
+                      {filteredInventory.length === 0 ? (
+                        <tr><td colSpan="5" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
+                      ) : (
+                        filteredInventory.map((item, index) => (
+                          <tr key={`inv-row-${item.id}-${index}`} className="hover:bg-blue-50/40 transition-colors group">
+                            <td className="px-10 py-6 font-mono font-black text-blue-700 text-xl tracking-tighter">{item.id}</td>
+                            <td className="px-10 py-6 font-bold text-slate-600 uppercase text-xs tracking-tight">{item.tipo}</td>
+                            <td className="px-10 py-6">
+                              <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm border ${
+                                item.estatus === 'CEDIS' ? 'bg-green-100 text-green-700 border-green-200' :
+                                item.estatus === 'En Tienda' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                                'bg-red-100 text-red-700 border-red-200'
+                              }`}>
+                                {item.estatus}
+                              </span>
+                            </td>
+                            <td className="px-10 py-6 text-slate-500 font-bold text-xs uppercase tracking-tight">{item.ubicacion}</td>
+                            <td className="px-10 py-6 text-right">
+                              <button className="text-slate-300 group-hover:text-blue-600 transition-all p-2 bg-slate-50 rounded-lg"><i className="fa-solid fa-chevron-right text-xl"></i></button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'stores' && (
+              <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
+                <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
+                  <div className="relative flex-1">
+                    <i className="fa-solid fa-magnifying-glass absolute left-5 top-5 text-slate-400 text-xl"></i>
+                    <input 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Buscar por ID, Nombre o Zona..." 
+                      className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
+                      <tr>
+                        <th className="px-10 py-6">ID Tienda</th>
+                        <th className="px-10 py-6">Nombre del Destino</th>
+                        <th className="px-10 py-6">Dirección</th>
+                        <th className="px-10 py-6">Zona</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-slate-50 text-sm">
+                      {filteredStores.length === 0 ? (
+                        <tr><td colSpan="4" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
+                      ) : (
+                        filteredStores.map((s, index) => (
+                          <tr key={`store-row-${s.id}-${index}`} className="hover:bg-blue-50/40 transition-colors group">
+                            <td className="px-10 py-6 font-mono font-black text-blue-700 text-lg tracking-tighter">{s.id}</td>
+                            <td className="px-10 py-6 font-bold text-slate-700 uppercase tracking-tight">{s.nombre}</td>
+                            <td className="px-10 py-6 text-slate-500 font-medium">{s.direccion}</td>
+                            <td className="px-10 py-6">
+                              <span className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200">
+                                {s.zona}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'users' && (
+              <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
+                <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
+                  <div className="relative flex-1">
+                    <i className="fa-solid fa-magnifying-glass absolute left-5 top-5 text-slate-400 text-xl"></i>
+                    <input 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Buscar por Usuario, Nombre o Rol..." 
+                      className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
+                      <tr>
+                        <th className="px-10 py-6">ID Usuario</th>
+                        <th className="px-10 py-6">Nombre Completo</th>
+                        <th className="px-10 py-6">Credencial (Login)</th>
+                        <th className="px-10 py-6">Nivel de Acceso</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-slate-50 text-sm">
+                      {filteredUsers.length === 0 ? (
+                        <tr><td colSpan="4" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
+                      ) : (
+                        filteredUsers.map((u, index) => (
+                          <tr key={`user-row-${u.id}-${index}`} className="hover:bg-blue-50/40 transition-colors group">
+                            <td className="px-10 py-6 font-mono font-black text-blue-700 text-lg tracking-tighter">{u.id}</td>
+                            <td className="px-10 py-6 font-bold text-slate-700 uppercase tracking-tight">{u.nombre}</td>
+                            <td className="px-10 py-6 text-slate-500 font-mono font-medium">{u.usuario}</td>
+                            <td className="px-10 py-6">
+                              <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
+                                u.rol === 'Superusuario' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}>
+                                {u.rol}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'incidents' && (
+              <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
+                <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
+                  <div className="relative flex-1">
+                    <i className="fa-solid fa-magnifying-glass absolute left-5 top-5 text-slate-400 text-xl"></i>
+                    <input 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Buscar por ID de Activo o Detalles..." 
+                      className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
+                      <tr>
+                        <th className="px-10 py-6">ID Incidencia</th>
+                        <th className="px-10 py-6">Activo Afectado</th>
+                        <th className="px-10 py-6">Tipo</th>
+                        <th className="px-10 py-6">Detalles</th>
+                        <th className="px-10 py-6">Fecha / Reportó</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-slate-50 text-sm">
+                      {filteredIncidents.length === 0 ? (
+                        <tr><td colSpan="5" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
+                      ) : (
+                        filteredIncidents.map((inc, index) => (
+                          <tr key={`inc-row-${inc.id}-${index}`} className="hover:bg-red-50/40 transition-colors group">
+                            <td className="px-10 py-6 font-mono font-black text-red-700 text-sm tracking-tighter">{inc.id}</td>
+                            <td className="px-10 py-6 font-bold font-mono text-slate-700 uppercase tracking-tight">{inc.activoId}</td>
+                            <td className="px-10 py-6">
+                              <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
+                                inc.tipo === 'Daño' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-red-100 text-red-700 border-red-200'
+                              }`}>
+                                {inc.tipo}
+                              </span>
+                            </td>
+                            <td className="px-10 py-6 text-slate-600 font-medium">{inc.descripcion}</td>
+                            <td className="px-10 py-6">
+                              <div className="text-xs font-bold text-slate-700">{inc.fecha}</div>
+                              <div className="text-[10px] text-slate-400 uppercase tracking-widest">{inc.usuario}</div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'moves' && (
+              <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm overflow-hidden animate-in fade-in zoom-in duration-300">
+                <div className="p-8 border-b-2 border-slate-50 bg-slate-50/30 flex gap-6">
+                  <div className="relative flex-1">
+                    <i className="fa-solid fa-magnifying-glass absolute left-5 top-5 text-slate-400 text-xl"></i>
+                    <input 
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Buscar por Folio, Usuario o Destino..." 
+                      className="w-full pl-14 pr-6 py-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-600 bg-white transition-all font-bold text-slate-700" 
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b-2 border-slate-100">
+                      <tr>
+                        <th className="px-10 py-6">Folio de Operación</th>
+                        <th className="px-10 py-6">Fecha y Hora</th>
+                        <th className="px-10 py-6">Tipo</th>
+                        <th className="px-10 py-6">Destino / Origen</th>
+                        <th className="px-10 py-6">Usuario</th>
+                        <th className="px-10 py-6">Grupo</th>
+                        <th className="px-10 py-6">Entregas</th>
+                        <th className="px-10 py-6">Activos (IDs)</th>
+                        <th className="px-10 py-6">Documento</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y-2 divide-slate-50 text-sm">
+                      {filteredMovements.length === 0 ? (
+                        <tr><td colSpan="9" className="px-10 py-10 text-center text-slate-400 font-bold">No se encontraron resultados</td></tr>
+                      ) : (
+                        [...filteredMovements].reverse().map((mov, index) => (
+                          <tr key={`mov-row-${mov.id || index}`} className="hover:bg-blue-50/40 transition-colors group">
+                            <td className="px-10 py-6 font-mono font-black text-slate-700 tracking-tighter text-sm">{mov.folio}</td>
+                            <td className="px-10 py-6 font-bold text-slate-500 text-xs tracking-tight">{mov.fecha}</td>
+                            <td className="px-10 py-6">
+                              <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border ${
+                                mov.tipo === 'Salida' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-blue-100 text-blue-700 border-blue-200'
+                              }`}>
+                                {mov.tipo}
+                              </span>
+                            </td>
+                            <td className="px-10 py-6 font-bold text-slate-600 uppercase text-xs tracking-tight">{mov.tienda}</td>
+                            <td className="px-10 py-6 text-slate-500 font-bold text-xs uppercase tracking-tight">{mov.usuario}</td>
+                            <td className="px-10 py-6 font-bold text-slate-600">{mov.grupo || '-'}</td>
+                            <td className="px-10 py-6 font-bold text-slate-600">{mov.entregas || '-'}</td>
+                            <td className="px-10 py-6 font-mono font-bold text-blue-600 text-xs truncate max-w-[150px]">{mov.activos}</td>
+                            <td className="px-10 py-6">
+                              {mov.pdf && mov.pdf.startsWith('http') ? (
+                                <a href={mov.pdf} target="_blank" rel="noreferrer" className="text-blue-500 hover:text-blue-700 font-black text-[10px] uppercase tracking-widest underline">
+                                  Ver Vale
+                                </a>
+                              ) : (
+                                <span className="text-slate-300 text-[10px] font-bold">N/A</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -681,16 +952,16 @@
 
             {/* MODALES DE CREACIÓN DE REGISTROS */}
             {showModal && (
-              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50">
-                <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border-4 border-slate-100">
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-in fade-in duration-200">
+                <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl border-4 border-slate-100 scale-in-center">
                   <div className="flex justify-between items-center mb-8">
                     <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">
                       {showModal === 'item' && 'Registrar Activo'}
                       {showModal === 'store' && 'Alta de Tienda'}
                       {showModal === 'user' && 'Nuevo Usuario'}
                     </h2>
-                    <button onClick={() => setShowModal(null)} className="p-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 hover:text-red-500 transition-colors">
-                      <i className="fa-solid fa-times text-xl"></i>
+                    <button onClick={() => setShowModal(null)} className="p-2 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200 hover:text-slate-800 transition-colors">
+                      <i className="fa-solid fa-xmark text-xl"></i>
                     </button>
                   </div>
 
@@ -698,35 +969,53 @@
                     <form className="space-y-5" onSubmit={async (e) => {
                       e.preventDefault();
                       if (isSaving) return;
+                      
                       const newId = e.target.id.value.toUpperCase();
+                      
                       if (inventory.some(item => item.id === newId)) {
-                        alert(`Error: El activo con ID "${newId}" ya existe.`);
+                        alert(`Error: El activo con ID "${newId}" ya se encuentra registrado en el inventario.`);
                         return;
                       }
+
                       setIsSaving(true);
-                      const nuevoActivo = { id: newId, tipo: e.target.tipo.value, estatus: 'CEDIS', ubicacion: 'Almacén Principal' };
+                      
+                      const nuevoActivo = { 
+                        id: newId, 
+                        tipo: e.target.tipo.value, 
+                        estatus: 'CEDIS', 
+                        ubicacion: 'Almacén Principal' 
+                      };
+                      
                       try {
-                        const result = await fetchAPI({ action: 'registrarActivo', payload: nuevoActivo });
+                        const result = await fetchAPI({
+                          action: 'registrarActivo',
+                          payload: nuevoActivo
+                        });
+                        
                         if (result && result.status === 'success') {
                           setInventory([nuevoActivo, ...inventory]);
                           setShowModal(null);
+                          alert("✅ Activo guardado en Google Sheets");
                         }
-                      } catch (error) { alert(`❌ Error: ${error.message}`); } 
-                      finally { setIsSaving(false); }
+                      } catch (error) {
+                        alert(`❌ Error al guardar: ${error.message}`);
+                      } finally {
+                        setIsSaving(false);
+                      }
                     }}>
                       <div>
                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">ID Único (Ej. H-1005 o P-5003)</label>
-                        <input name="id" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-mono uppercase focus:border-blue-500 outline-none font-bold" placeholder="H-XXXX" />
+                        <input name="id" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-mono uppercase focus:border-blue-500 outline-none transition-colors font-bold text-slate-800" placeholder="H-XXXX" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Clasificación</label>
-                        <select name="tipo" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold">
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Clasificación de Activo</label>
+                        <select name="tipo" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800 appearance-none">
                           <option>Hielera</option>
                           <option>Placa</option>
                         </select>
                       </div>
-                      <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 disabled:opacity-50">
-                        {isSaving ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Guardar Activo'}
+                      <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50">
+                        {isSaving ? <i className="fa-solid fa-spinner fa-spin text-lg"></i> : 'Guardar Activo'}
                       </button>
                     </form>
                   )}
@@ -736,32 +1025,47 @@
                       e.preventDefault();
                       if (isSaving) return;
                       setIsSaving(true);
-                      const newStore = { id: `T-0${stores.length + 1}`, nombre: e.target.nombre.value, direccion: e.target.direccion.value, zona: e.target.zona.value };
+                      
+                      const newStore = { 
+                        id: `T-0${stores.length + 1}`, 
+                        nombre: e.target.nombre.value, 
+                        direccion: e.target.direccion.value, 
+                        zona: e.target.zona.value 
+                      };
+                      
                       try {
-                        const result = await fetchAPI({ action: 'registrarTienda', payload: newStore });
+                        const result = await fetchAPI({
+                          action: 'registrarTienda',
+                          payload: newStore
+                        });
+                        
                         if (result && result.status === 'success') {
                           setStores([...stores, newStore]);
                           setShowModal(null);
+                          alert("✅ Tienda guardada en Google Sheets");
                         }
-                      } catch (error) { alert(`❌ Error: ${error.message}`); } 
-                      finally { setIsSaving(false); }
+                      } catch (error) {
+                        alert(`❌ Error al guardar: ${error.message}`);
+                      } finally {
+                        setIsSaving(false);
+                      }
                     }}>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Nombre de Sucursal</label>
-                        <input name="nombre" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold" placeholder="Ej. OXXO Centro" />
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Nombre de la Sucursal</label>
+                        <input name="nombre" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800" placeholder="Ej. OXXO Centro" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Dirección</label>
-                        <input name="direccion" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none font-medium" placeholder="Calle..." />
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Dirección Completa</label>
+                        <input name="direccion" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-medium text-slate-800" placeholder="Calle, número, colonia..." />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Zona</label>
-                        <select name="zona" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold">
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Zona Operativa</label>
+                        <select name="zona" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800 appearance-none">
                           <option>Norte</option><option>Sur</option><option>Centro</option><option>Oriente</option><option>Poniente</option>
                         </select>
                       </div>
-                      <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 disabled:opacity-50">
-                        {isSaving ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Registrar Tienda'}
+                      <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50">
+                        {isSaving ? <i className="fa-solid fa-spinner fa-spin text-lg"></i> : 'Registrar Tienda'}
                       </button>
                     </form>
                   )}
@@ -771,66 +1075,101 @@
                       e.preventDefault();
                       if (isSaving) return;
                       setIsSaving(true);
-                      const newUser = { id: `U-0${usersList.length + 1}`, usuario: e.target.usuario.value, password: e.target.password.value, nombre: e.target.nombre.value, rol: e.target.rol.value };
+                      
+                      const newUser = { 
+                        id: `U-0${usersList.length + 1}`, 
+                        usuario: e.target.usuario.value,
+                        password: e.target.password.value,
+                        nombre: e.target.nombre.value, 
+                        rol: e.target.rol.value 
+                      };
+                      
                       try {
-                        const result = await fetchAPI({ action: 'registrarUsuario', payload: newUser });
+                        const result = await fetchAPI({
+                          action: 'registrarUsuario',
+                          payload: newUser
+                        });
+                        
                         if (result && result.status === 'success') {
                           setUsersList([...usersList, newUser]);
                           setShowModal(null);
+                          alert("✅ Usuario guardado en Google Sheets");
                         }
-                      } catch (error) { alert(`❌ Error: ${error.message}`); } 
-                      finally { setIsSaving(false); }
+                      } catch (error) {
+                        alert(`❌ Error al guardar: ${error.message}`);
+                      } finally {
+                        setIsSaving(false);
+                      }
                     }}>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Nombre Real</label>
-                        <input name="nombre" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold" placeholder="Ej. Carlos" />
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Nombre y Apellido</label>
+                        <input name="nombre" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800" placeholder="Ej. Carlos Martínez" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Usuario Login</label>
-                        <input name="usuario" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl font-mono focus:border-blue-500 outline-none font-bold" placeholder="cmartinez" />
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Usuario (Credencial)</label>
+                        <input name="usuario" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl font-mono focus:border-blue-500 outline-none font-bold text-slate-800" placeholder="cmartinez" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Contraseña</label>
-                        <input name="password" type="password" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold" placeholder="••••••••" />
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Contraseña de Acceso</label>
+                        <input name="password" type="password" required className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800" placeholder="••••••••" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Rol</label>
-                        <select name="rol" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-xl focus:border-blue-500 outline-none font-bold">
-                          <option>Operador</option><option>Superusuario</option>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Nivel de Privilegios</label>
+                        <select name="rol" className="w-full p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-500 outline-none font-bold text-slate-800 appearance-none">
+                          <option>Operador</option>
+                          <option>Superusuario</option>
                         </select>
                       </div>
-                      <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 disabled:opacity-50">
-                        {isSaving ? <i className="fa-solid fa-spinner fa-spin"></i> : 'Crear Usuario'}
+                      <button type="submit" disabled={isSaving} className="w-full flex items-center justify-center gap-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest mt-6 hover:bg-blue-700 shadow-xl shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50">
+                        {isSaving ? <i className="fa-solid fa-spinner fa-spin text-lg"></i> : 'Crear Usuario'}
                       </button>
                     </form>
                   )}
+
                 </div>
               </div>
             )}
-
           </main>
         </div>
       );
     };
 
+    // --- COMPONENTES ATÓMICOS ---
     const NavItem = ({ icon, label, active, onClick }) => (
-      <button onClick={onClick} className={`w-full flex items-center gap-5 px-6 py-5 rounded-2xl font-black transition-all text-sm uppercase tracking-widest ${active ? 'bg-blue-600 text-white shadow-xl translate-x-2' : 'text-slate-500 hover:bg-slate-800'}`}>
-        {icon} <span>{label}</span>
+      <button 
+        onClick={onClick}
+        className={`w-full flex items-center gap-5 px-6 py-5 rounded-2xl font-black transition-all text-sm uppercase tracking-widest ${
+          active ? 'bg-blue-600 text-white shadow-2xl translate-x-3 scale-105' : 'text-slate-500 hover:bg-slate-800/80 hover:text-slate-300'
+        }`}
+      >
+        <div className={`${active ? 'text-white' : 'text-slate-600'}`}>{icon}</div>
+        <span>{label}</span>
       </button>
     );
 
     const StatCard = ({ label, value, icon, color }) => {
-      const c = { blue: 'border-l-blue-600', green: 'border-l-green-600', orange: 'border-l-orange-600', red: 'border-l-red-600' };
+      const colors = {
+        blue: 'border-l-blue-600 shadow-blue-900/5',
+        green: 'border-l-green-600 shadow-green-900/5',
+        orange: 'border-l-orange-600 shadow-orange-900/5',
+        red: 'border-l-red-600 shadow-red-900/5'
+      };
       return (
-        <div className={`bg-white p-8 rounded-3xl border-l-[10px] shadow-sm border-y border-r border-slate-100 ${c[color]}`}>
+        <div className={`bg-white p-10 rounded-3xl border-l-[10px] shadow-2xl transition-all hover:-translate-y-2 cursor-default border-t border-r border-b border-slate-100 ${colors[color]}`}>
           <div className="flex justify-between items-start">
-            <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{label}</p><p className="text-4xl font-black">{value}</p></div>
-            <div className="p-4 bg-slate-50 rounded-xl">{icon}</div>
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 leading-none">{label}</p>
+              <p className="text-5xl font-black text-slate-900 tracking-tighter leading-none">{value}</p>
+            </div>
+            <div className="p-5 bg-slate-50 rounded-2xl shadow-inner border border-slate-100">
+              {icon}
+            </div>
           </div>
         </div>
       );
     };
 
+    // Renderizar la app
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
